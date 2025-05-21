@@ -31,3 +31,28 @@ python3 main.py -i input_files/input_file.yaml (-o output_folder)
 
 # Use the diagnostic tools
 Use the notebook in `diagnostics/diag_main.ipynb` to explore the results of a simulation or create movies.
+
+<table>
+  <tr>
+    <td align="center">
+      <strong>SOL - Uniform - driftwave & interchange</strong><br>
+      <img src="doc/fig/density_SOL_cropped.gif" width="300">
+    </td>
+    <td align="center">
+      <strong>SOL - Blob - driftwave only</strong><br>
+      <img src="doc/fig/density_blob_driftwave_cropped.gif" width="300">
+    </td>
+    <td align="center">
+      <strong>SOL - Blob - interchange only</strong><br>
+      <img src="doc/fig/density_blob_interchange_cropped.gif" width="300">
+    </td>
+    <td align="center">
+      <strong>Hasegawa-Wakatani</strong><br>
+      <img src="doc/fig/vorticity_HW_cropped.gif" width="300">
+    </td>
+    <td align="center">
+      <strong>Modified Hasegawa-Wakatani</strong><br>
+      <img src="doc/fig/vorticity_mHW_cropped.gif" width="300">
+    </td>
+  </tr>
+</table>
