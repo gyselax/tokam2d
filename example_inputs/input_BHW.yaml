@@ -1,0 +1,80 @@
+
+grid:
+  Nx: 256 # Number of grid points in x
+  Ny: 256 # Number of grid points in y
+  Lx: 64. # Length of the domain in x in reference ion Larmor radius
+  Ly: 64. # Length of the domain in y in reference ion Larmor radius
+
+  x64_precision: false # Use 64-bit precision for x grid (default is 32-bit)
+
+time: # Unit is reference ion cyclotron period unless specified
+  #  Choose three among dt_diag, dt_rk4, Nt_diag, Nt_rk4, Tsim (rk4_per_diag can replace one of [dt_diag, dt_rk4])
+
+  dt_rk4: null      # Time step for RK4 scheme
+  dt_diag: null     # Time step for diagnostics
+  rk4_per_diag: 64  # Number of RK4 steps between two saving of outputs
+  Tsim: 100.        # Total simulation time (overriden for HW schemes unless HW_duration=0)
+  Nt_rk4: null      # Number of total RK4 steps
+  Nt_diag: 2048     # Number of time steps between two saving of outputs
+
+pde:
+  eq: "BHW" # Choice between "SOL", "HW", "mHW" ,"BHW"
+
+  ## SOL / Edge scheme ##
+  sigma_nn:     6.1e-05 # Damping coefficient in density equation 
+  sigma_nphi:   6.1e-05 # Potential coupling coefficient in density equation
+  sigma_phiphi: 6.1e-05 # Damping coefficient in potential equation
+  sigma_phin:   6.1e-05 # Density coupling coefficient in potential equation
+
+  ## Hasegawa-Wakatani schemes ##
+  C: 2. # Adiabaticity parameter
+  kappa: 0.75 # -dln(n0(x))/dx with n0(x) the background density
+  HW_duration: 40. # Duration simulation in estimated inverse linear growth rate, overrides Tsim unless HW_duration=0
+
+  ## Shared parameters for HW and SOL models ##
+  dissipation_type: ["hyperdiffusion", "friction",] # "diffusion" or "hyperdiffusion" or "friction"
+  Dn:               [1.e-4           , 0.        ,] # Dissipation coefficient in density equation
+  Dphi:             [1.e-4           , 1.e-2     ,] # Dissipation coefficient in potential equation
+  g: 0.e-0 # Magnetic curvature (HW suggested normalizations have a factor L compared with SOL)
+
+initial_condition:
+  # 2D Gaussian initialization
+  init_gauss_ampl_n:   [0. ,] # Peak amplitude of the Gaussian in density
+  init_gauss_ampl_phi: [0. ,] # Peak amplitude of the Gaussian in potential
+  init_gauss_sigma_x:  [0. ,] # Std of the Gaussian in density
+  init_gauss_sigma_y:  [0. ,] # Std of the Gaussian in potential
+  init_gauss_x0:       [0.,] # Center position of the Gaussian in x
+  init_gauss_y0:       [0.,] # Center position of the Gaussian in y
+
+  # Uniform initialization
+  init_uni_ampl_n:   0. # Background density amplitude
+  init_uni_ampl_phi: 0. # Background potential amplitude
+
+  # Harmonic initial perturbation
+  init_harm_kx:       [0, ] # Harmonic in x of the perturbation
+  init_harm_ky:       [0, ] # Harmonic in y of the perturbation
+  init_harm_ampl_n:   [0.e-0, ] # Amplitude of the perturbation in density
+  init_harm_ampl_phi: [0.e-2, ] # Amplitude of the perturbation in potential
+
+  # Random initial perturbation
+  init_rand_ampl_n: 0. # Amplitude of the random perturbation in density
+  init_rand_ampl_phi: 1.e-3 # Amplitude of the random perturbation in potential
+
+source:
+  # Gaussian source (set sigma=0 for uniform source along a direction)
+  source_gauss_ampl_n:   [0.   ,] # Peak amplitude of the Gaussian in density
+  source_gauss_ampl_phi: [0.   ,] # Peak amplitude of the Gaussian in potential
+  source_gauss_sigma_x:  [0.   ,] # Std of the Gaussian in density
+  source_gauss_sigma_y:  [0.   ,] # Std of the Gaussian in potential
+  source_gauss_x0:       [0.   ,] # Center position of the Gaussian in x
+  source_gauss_y0:       [0.   ,] # Center position of the Gaussian in y
+
+  source_balance_par_loss: false # Balance parallel losses (maintain constant density background)
+
+callbacks:
+  check_crash: true # Check for simulation crash in line
+  save_real: true # Save real space fields
+  save_fft: true # Save Fourier space fields
+
+inline_operations:
+  fft_filter: true # 2/3 rule for dealiasing

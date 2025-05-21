@@ -1,0 +1,16 @@
+# .github/workflows/CI.yml
+name: CI
+
+on: [push, pull_request]  # Trigger on push and pull requests
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    - run: pip install -r requirements_cpu.txt
+    - run: python -m tests.smoke_test
