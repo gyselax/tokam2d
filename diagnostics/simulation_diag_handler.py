@@ -1,20 +1,20 @@
-import argparse
-import glob
+# Import from built-in modules
 import io
 import logging
 import operator
 import os
 import time
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 from typing import Any
 
+# Import from external modules
+import numpy as np
 import h5py
-import imageio
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-import numpy as np
 from matplotlib.ticker import FuncFormatter
+import imageio
 
 # Map strings to operator functions
 operator_map = {
@@ -30,102 +30,110 @@ class Simulation:
     It makes use of lazy loading and caching for fast visualization.
     """
 
+    # Ensure singleton behavior per simulation path
+    # TODO(RV): Fix behaviour when an instantiation fails and leaves a broken instance in the cache
+    _cache = {}
+
+    def __new__(cls, myparam):
+        if myparam in cls._cache:
+            return cls._cache[myparam]
+
+        instance = super().__new__(cls)
+        cls._cache[myparam] = instance
+        return instance
+
     def __init__(self, sim_data_path) -> None:
-        self.sim_folder_path = Path(sim_data_path)
-        self.name = self.sim_folder_path.name
-        self.data = {}
-        #TODO(RV) Account for restarts seemlessly
-        self.sim_data = h5py.File(self._get_first_data_file(), "r")
-        try:
-            self.sim_inputs = h5py.File(
-                sim_data_path+"/input_params_TOKAM_00.h5", "r")
-        except:
-            self.sim_inputs = h5py.File(
-                sim_data_path+"/user_inputs.h5", "r")
-        try:
-            self.sim_metadata = h5py.File(
-                sim_data_path+"/metadata_TOKAM_00.h5", "r")
-        except:
-            self.sim_metadata = h5py.File(
-                sim_data_path+"/metadata.h5", "r")
-        self.kx = self._get_kx()[()]
-        self.ky = self._get_ky()[()]
-        self.kx2D = np.array(self.kx)[np.newaxis,:]*np.ones_like(self.ky)[:,np.newaxis]
-        self.ky2D = np.array(self.ky)[:,np.newaxis]*np.ones_like(self.kx)[np.newaxis,:]
-        self.k2D  = np.sqrt(self.kx2D**2 + self.ky2D**2)
+        if not hasattr(self, "_initialized"):
+            self._initialized = True
+            
+            self.sim_folder_path = Path(sim_data_path)
+            self.name = self.sim_folder_path.name
+            self.data = {}
+            #TODO(RV) Account for restarts seemlessly
+            self.sim_data = h5py.File(self._get_first_data_file(), "r")
+            try:
+                self.sim_inputs = h5py.File(
+                    sim_data_path+"/input_params_TOKAM_00.h5", "r")
+            except:
+                self.sim_inputs = h5py.File(
+                    sim_data_path+"/user_inputs.h5", "r")
+            try:
+                self.sim_metadata = h5py.File(
+                    sim_data_path+"/metadata_TOKAM_00.h5", "r")
+            except:
+                self.sim_metadata = h5py.File(
+                    sim_data_path+"/metadata.h5", "r")
+            self.kx = self._get_kx()[()]
+            self.ky = self._get_ky()[()]
+            self.kx2D = np.array(self.kx)[np.newaxis,:]*np.ones_like(self.ky)[:,np.newaxis]
+            self.ky2D = np.array(self.ky)[:,np.newaxis]*np.ones_like(self.kx)[np.newaxis,:]
+            self.k2D  = np.sqrt(self.kx2D**2 + self.ky2D**2)
 
-        self.time = np.array(self["time"])
-        self.t = self.time
-        self.x = np.array(self["x"])
-        self.y = np.array(self["y"])
+            self.time = np.array(self["time"])
+            self.t = self.time
+            self.x = np.array(self["x"])
+            self.y = np.array(self["y"])
 
-        self.Nx = len(self.x)
-        self.Ny = len(self.y)
+            self.Nx = len(self.x)
+            self.Ny = len(self.y)
 
-        self.Ly = self["Ly"][()]
-        self.Lx = self["Lx"][()]
+            self.Ly = self["Ly"][()]
+            self.Lx = self["Lx"][()]
 
-        self.dx = self["Lx"][()]/self.Nx
-        self.dy = self["Ly"][()]/self.Ny
+            self.dx = self["Lx"][()]/self.Nx
+            self.dy = self["Ly"][()]/self.Ny
 
-        self.simulation_duration = self["time"][-1] - self["time"][0]
-        self.dt_diag = self.simulation_duration / len(self["time"])
+            self.simulation_duration = self["time"][-1] - self["time"][0]
+            self.dt_diag = self.simulation_duration / len(self["time"])
 
-        self.dt_RK4 = [self["dt_rk4"][()] if "dt_rk4" in self.sim_inputs else None][0]
+            self.dt_RK4 = [self["dt_rk4"][()] if "dt_rk4" in self.sim_inputs else None][0]
 
-        # Dictionnary of rule to compute new fields
-        self.field_mapping = {
-            "VEy":{
-                "base_fields": ["phi"],
-                "dx": [1],
-                "dy": [0],
-                "power": [1],
-                "operators": None,
-                "sign": 1},
-            "VEx":{
-                "base_fields": ["phi"],
-                "dx": [0],
-                "dy": [1],
-                "power": [1],
-                "operators": None,
-                "sign": -1},
-            "vorticity":{
-                "base_fields": ["phi"],
-                "dx": [2],
-                "dy": [2],
-                "power": [1],
-                "operators": None,
-                "sign": 1},
-            # Combinatory fields
-            "reynolds_stress":{
-                "base_fields": ["phi", "phi"],
-                "dx": [0, 1],
-                "dy": [1, 0],
-                "power": [1, 1],
-                "operators":  ["*"],
-                "sign": -1},
-            "flux":{
-                "base_fields": ["n", "phi"],
-                "dx": [0, 0],
-                "dy": [0, 1],
-                "power": [1, 1],
-                "operators": ["*"],
-                "sign": -1},
-            "Isq":{
-                "base_fields": ["n", "n", "n"],
-                "dx": [1, 0, 0],
-                "dy": [0, 1, 0],
-                "power": [2, 2, 2],
-                "operators": ["+", "/"],
-                "sign": 1},
-            "density":{
-                "base_fields": ["n"],
-                "dx": [0],
-                "dy": [0],
-                "power": [1],
-                "operators": [],
-                "sign": 1},
-        }
+            # Dictionnary of rule to compute new fields
+            self.field_mapping = {
+                "VEy":{
+                    "base_fields": ["phi"],
+                    "dx": [1],
+                    "dy": [0],
+                    "power": [1],
+                    "operators": None,
+                    "sign": 1},
+                "VEx":{
+                    "base_fields": ["phi"],
+                    "dx": [0],
+                    "dy": [1],
+                    "power": [1],
+                    "operators": None,
+                    "sign": -1},
+                "vorticity":{
+                    "base_fields": ["phi"],
+                    "dx": [2],
+                    "dy": [2],
+                    "power": [1],
+                    "operators": None,
+                    "sign": 1},
+                # Combinatory fields
+                "reynolds_stress":{
+                    "base_fields": ["phi", "phi"],
+                    "dx": [0, 1],
+                    "dy": [1, 0],
+                    "power": [1, 1],
+                    "operators":  ["*"],
+                    "sign": -1},
+                "flux":{
+                    "base_fields": ["n", "phi"],
+                    "dx": [0, 0],
+                    "dy": [0, 1],
+                    "power": [1, 1],
+                    "operators": ["*"],
+                    "sign": -1},
+                "Isq":{
+                    "base_fields": ["n", "n", "n"],
+                    "dx": [1, 0, 0],
+                    "dy": [0, 1, 0],
+                    "power": [2, 2, 2],
+                    "operators": ["+", "/"],
+                    "sign": 1},
+            }
 
     def __repr__(self) -> str:
         """Print usefull information about the simulation."""
@@ -185,31 +193,23 @@ class Simulation:
             try:
                 return self.sim_data["dens_evol"]
             except KeyError:
-                print(f"Key {key} not in simulation data, computing ...")
-                self.data["density"] = np.fft.ifft2(self["density_fft"], axes=(-2, -1)).real
-                return self.data["density"]
+                raise KeyError(f"Key {key}, use the get_data_slice method to compute it on the fly.")
         elif key == "potential" and key not in available_keys:
             try:
                 return self.sim_data["phi_evol"]
             except KeyError:
-                print(f"Key {key} not in simulation data, computing ...")
-                self.data["potential"] = np.fft.ifft2(self["potential_fft"], axes=(-2, -1)).real
-                return self.data["potential"]
+                raise KeyError(f"Key {key}, use the get_data_slice method to compute it on the fly.")
         # Handle previous version
         elif key == "potential_fft" and key not in available_keys:
             try:
                 return self.sim_data["phi_fft"]
             except KeyError:
-                print(f"Key {key} not in simulation data, computing ...")
-                self.data["potential_fft"] = np.fft.fft2(self["potential"], axes=(-2, -1))
-                return self.data["potential_fft"]
+                raise KeyError(f"Key {key}, use the get_data_slice method to compute it on the fly.")
         elif key == "density_fft" and key not in available_keys:
             try:
                 return self.sim_data["n_fft"]
             except KeyError:
-                print(f"Key {key} not in simulation data, computing ...")
-                self.data["density_fft"] = np.fft.fft2(self["density"], axes=(-2, -1))
-                return self.data["density_fft"]
+                raise KeyError(f"Key {key}, use the get_data_slice method to compute it on the fly.")
         else:
             # raise KeyError(f"Key {key} not found.")
             print(f"Key {key} not found.")
@@ -228,13 +228,25 @@ class Simulation:
         y_slice = iy if iy is not None else slice(None)
         it_slice = it if it is not None else slice(None)
 
-        # Handle the field
+        # If the field is already in simulation output, return it
         if field in self.sim_data:
             return self[field][it_slice, y_slice, x_slice]
+        
+        # If only real or fft fields have been saved, compute the other one on the fly
+        if field == "potential":
+            return (np.fft.ifft2(self["potential_fft"][it_slice], axes=(-2, -1)).real)[..., y_slice, x_slice]
+        if field == "density":
+            return (np.fft.ifft2(self["density_fft"][it_slice], axes=(-2, -1)).real)[..., y_slice, x_slice]
+        if field == "potential_fft":
+            return np.fft.fft2(self["potential"][it_slice], axes=(-2, -1))[..., y_slice, x_slice]
+        if field == "density_fft":
+            return np.fft.fft2(self["density"][it_slice], axes=(-2, -1))[..., y_slice, x_slice]
 
+        # If the name of the field is not in the mapping, raise an error
         if field not in self.field_mapping:
             raise KeyError(f"Field {field} not found in mapping.")
 
+        # Else, compute the field using the mapping rules
         params = self.field_mapping[field]
         base_fields, dx, dy, power, operators, sign = [params[key] for key in ["base_fields", "dx", "dy", "power", "operators", "sign"]]
 
@@ -290,7 +302,7 @@ class Simulation:
             else:
                 ik = (1j * self.k2D)**dx
 
-        field_fft = self[self._field_key_fft(field)][it]
+        field_fft = self.get_data_slice(self._field_key_fft(field), it=it)
         derivative_fft = ik * field_fft
         return ((np.fft.ifft2(derivative_fft, axes=(-2, -1)).real)**power)[..., iy, ix]
 
@@ -443,7 +455,7 @@ class Simulation:
                 writer.append_data(imageio.imread(frame_path))
         logging.info(f'Movie {title} created successfully at {save_folder_path}!')
 
-    def make_movie(self, field, path=None, filename=None, it_slice=None, parallel=True, num_cores=None, for_IA=False, scheme=False, cmap='plasma', vmin=None, vmax=None, fps=30, save_frames=False):
+    def make_movie(self, field, path=None, filename=None, it_slice=None, parallel=True, num_cores=None, for_IA=False, scheme=False, cmap='plasma', vmin=None, vmax=None, fps=30, save_frames=False, custom_field_name='custom_field'):
         """Generate a movie for a specific field.
 
         Optional parallel execution.
@@ -471,13 +483,20 @@ class Simulation:
             num_cores = os.cpu_count()
         parallel_warning = "\nWARNING: Parallel execution might get stuck if the CPU usage is too high prior to running this script." + \
                         "\nIf this happens, you can try to kill the processes intensively using CPU, e.g. VScode (use can use the 'htop' shell command to see a list of current processes)."
-        logging.warning(parallel_warning)
+        if parallel: logging.warning(parallel_warning)
 
         start_time = time.time()
 
         # **Load the time and field slices into memory** before passing them to parallel workers
-        time_frames = np.array(self['time'][it_slice])  
-        data_frames = np.array(self.get_data_slice(field, it=it_slice)) 
+        if isinstance(field, str):
+            time_frames = np.array(self['time'][it_slice])
+            data_frames = np.array(self.get_data_slice(field, it=it_slice))
+        elif isinstance(field, np.ndarray):
+            logging.warning("Custom field provided as ndarray, itslice will be ignored.")
+            time_len = field.shape[0]
+            time_frames = np.array(self['time'][:time_len])
+            data_frames = field
+            field = custom_field_name # Name for the custom field
 
         # Generate frames using the data already loaded into memory
         frames = self._generate_and_save_frames(parallel, num_cores, for_IA, scheme, path, filename, time_frames, data_frames, field, cmap, vmin, vmax)
@@ -489,8 +508,7 @@ class Simulation:
             for frame in frames:
                 os.remove(frame)
             os.rmdir(path / f'{filename}_{field}_frames')
-
-        logging.info('Frames deleted successfully!')
+            logging.info('Frames deleted successfully!')
 
         logging.info(f"Execution time: {time.time() - start_time:.2f} s")
 
