@@ -11,20 +11,20 @@ time: # Unit is reference ion cyclotron period unless specified
   #  Choose three among dt_diag, dt_rk4, Nt_diag, Nt_rk4, Tsim (rk4_per_diag can replace one of [dt_diag, dt_rk4])
 
   dt_rk4: null      # Time step for RK4 scheme
-  dt_diag: 16        # Time step for diagnostics
+  dt_diag: 16       # Time step for diagnostics
   rk4_per_diag: 64  # Number of RK4 steps between two saving of outputs
   Tsim: null        # Total simulation time (overriden for HW schemes unless HW_duration=0)
   Nt_rk4: null      # Number of total RK4 steps
-  Nt_diag: 1024     # Number of time steps between two saving of outputs
+  Nt_diag: 1024     # Number of total diagnostic time steps
 
 pde:
   eq: "SOL" # Choice between "SOL", "HW", "mHW" ,"BHW"
 
   ## SOL / Edge scheme ##
   sigma_nn:     6.1e-05 # Damping coefficient in density equation 
-  sigma_nphi:   6.1e-05      # Potential coupling coefficient in density equation
+  sigma_nphi:   6.1e-05 # Potential coupling coefficient in density equation
   sigma_phiphi: 6.1e-05 # Damping coefficient in potential equation
-  sigma_phin:   6.1e-05      # Density coupling coefficient in potential equation
+  sigma_phin:   6.1e-05 # Density coupling coefficient in potential equation
 
   ## Hasegawa-Wakatani schemes ##
   C: 0. # Adiabaticity parameter
@@ -38,6 +38,10 @@ pde:
   g: 0. # Magnetic curvature (HW suggested normalizations have a factor L compared with SOL)
 
 initial_condition:
+  # Restart from previous simulation
+  load_init_fields: false # Load initial fields from file
+  load_init_path: "/path/to/sim_folder" # Path to simulation folder for restart
+  
   # 2D Gaussian initialization
   init_gauss_ampl_n:   [2.  , -2] # Peak amplitude of the Gaussian in density
   init_gauss_ampl_phi: [0.  , 0.] # Peak amplitude of the Gaussian in potential
