@@ -15,7 +15,7 @@ time: # Unit is reference ion cyclotron period unless specified
   rk4_per_diag: 64  # Number of RK4 steps between two saving of outputs
   Tsim: 100.        # Total simulation time (overriden for HW schemes unless HW_duration=0)
   Nt_rk4: null      # Number of total RK4 steps
-  Nt_diag: 2048     # Number of time steps between two saving of outputs
+  Nt_diag: 2048     # Number of total diagnostic time steps
 
 pde:
   eq: "HW" # Choice between "SOL", "HW", "mHW" ,"BHW"
@@ -38,6 +38,10 @@ pde:
   g: 0.e-0 # Magnetic curvature (HW suggested normalizations have a factor L compared with SOL)
 
 initial_condition:
+  # Restart from previous simulation
+  load_init_fields: false # Load initial fields from file
+  load_init_path: "/path/to/sim_folder" # Path to simulation folder for restart
+  
   # 2D Gaussian initialization
   init_gauss_ampl_n:   [0. ,] # Peak amplitude of the Gaussian in density
   init_gauss_ampl_phi: [0. ,] # Peak amplitude of the Gaussian in potential

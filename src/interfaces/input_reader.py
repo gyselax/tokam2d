@@ -257,6 +257,7 @@ class StaticParams:
             ("C"                , "pde"              , None),
             ("g"                , "pde"              , None),
             # Initial condition
+            ("load_init_fields"   , "initial_condition", False),
             ("init_gauss_ampl_n"  , "initial_condition", [0.]),
             ("init_gauss_ampl_phi", "initial_condition", [0.]),
             ("init_gauss_x0"      , "initial_condition", [0.]),

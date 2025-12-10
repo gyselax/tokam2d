@@ -36,6 +36,32 @@ class FieldInitiator():
         # Initialize the logger
         self.logger = params.logger
 
+        # Handle case where user provide custom initial density and potential
+        self.bool_load_init = self.param_init.get('load_init_fields', False)
+
+    def _load_custom_init(self):
+        # Load custom initial fields from hdf5 file
+        from pathlib import Path
+        custom_init_path = Path(self.param_init.get('load_init_path', None)) / "simulation_fields.h5"
+        if not custom_init_path.exists():
+            raise ValueError(f"load_init_fields set to True but path {custom_init_path} does not exist.")
+
+        self.logger.info(f"Loading custom initial fields from {custom_init_path}")
+        import h5py
+        with h5py.File(custom_init_path, 'r') as f:
+            if 'density_fft' in f.keys() and 'potential_fft' in f.keys():
+                density_fft_init = f['density_fft'][-1,...]
+                potential_fft_init = f['potential_fft'][-1,...]
+            elif 'density' in f.keys() and 'potential' in f.keys():
+                density_real_init = f['density'][-1,...]
+                potential_real_init = f['potential'][-1,...]
+                density_fft_init = np.fft.fft2(density_real_init)
+                potential_fft_init = np.fft.fft2(potential_real_init)
+            else:
+                raise ValueError("Custom initial fields file must contain either 'density_fft' and 'potential_fft' or 'density' and 'potential'.")
+        self.density_fft_init = density_fft_init
+        self.potential_fft_init = potential_fft_init
+
     def _uniform_fft_init(self):
         # Uniform initial parameters
         amp_n = self.param_init['init_uni_ampl_n']
@@ -119,16 +145,24 @@ class FieldInitiator():
 
     def initial_fields(self):
 
-        self._uniform_fft_init()
-        self._2D_gaussian_fft_init()
-        self._harmonic_fft_init()
-        self._random_fft_init()
+        if self.bool_load_init:
+            self._load_custom_init()
+        else:
+            self._uniform_fft_init()
+            self._2D_gaussian_fft_init()
+            self._harmonic_fft_init()
+            self._random_fft_init()
 
         return {"density_fft": self.mask_fft*self.density_fft_init, "potential_fft": self.mask_fft*self.potential_fft_init}
 
     def __repr__(self):
 
         repr_str = ""
+
+        if self.bool_load_init:
+            load_path = self.param_init.get('load_init_path', None)
+            repr_str += f"Custom initial fields loaded from folder: {load_path}\n"
+            return repr_str
 
         # Uniform initialization
         repr_str += f"Amplitude of density uniform perturbation: {self.param_init['init_uni_ampl_n']}\n"
