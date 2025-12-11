@@ -1,0 +1,10 @@
+# Core dependencies
+numpy
+matplotlib
+h5py
+h5netcdf
+pyyaml
+jax[rocm]
+
+# Optional
+imageio[ffmpeg]
