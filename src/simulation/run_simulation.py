@@ -5,6 +5,9 @@ import functools
 from jax import jit
 from functools import partial
 
+# For spawning tests
+import random
+
 @jit
 def add_states(*states):
     """
@@ -70,6 +73,9 @@ class SimulationRunner:
         # Retrieve the PDE parameters
         self.eq = params.user["pde"]["eq"]
         self.pde = params.pde
+
+        # Retrieve the parameters related to the grid
+        self.grid = params.user["grid"]
 
         # Retrieve the time parameters and initialize the clocks
         self.Nt_rk4 = params.user["time"]["Nt_rk4"]
@@ -154,6 +160,24 @@ class SimulationRunner:
         if self.user_inline_operations.get('fft_filter', False):
             self.logger.info("Enabling 2/3 de-aliasing rule...")
             self.inline_operations.append(self._apply_fft_mask)
+        # Enable structure spawning
+        if self.user_inline_operations.get('struct_spawn', False):
+            random_seed = self.user_inline_operations.get('spawn_rand_seed', 42)
+            random.seed(random_seed)
+
+            self.kx_2d = self.grid["kx_2d"]
+            self.ky_2d = self.grid["ky_2d"]
+            self.norm = (self.grid["Nx"]/self.grid["Lx"] * self.grid["Ny"]/self.grid["Ly"])
+
+            self.spawn_period = self.user_inline_operations["spawn_struct_period"]
+            self.ampl_n = self.user_inline_operations['spawn_gauss_ampl_n']
+            self.sigma_x = self.user_inline_operations['spawn_gauss_sigma_x']
+            self.sigma_y = self.user_inline_operations['spawn_gauss_sigma_y']
+            self.x0 = self.user_inline_operations['spawn_gauss_x0']
+            self.y0 = self.user_inline_operations['spawn_gauss_y0']
+            self.rand_y0 = self.user_inline_operations['spawn_rand_y0']
+            self.logger.info("Density structure will be spawned during simulation...")
+            self.inline_operations.append(self._spawn_structure)
 
     def _init_inline_display(self):
         # Display simulation progress
@@ -187,3 +211,30 @@ class SimulationRunner:
     # Inline display
     def _display_progress(self):
         self.logger.info(f"Save {self.step_diag_count}/{self.Nt_diag} of {self._save_text} fields | t={self.time:.3f} (RK4 step {self.step_rk4_count}/{self.Nt_rk4}).")
+
+    # Inline structure spawning
+    def _spawn_structure(self, fields):
+
+        y0 = self.y0
+        if self.time%self.spawn_period < self.dt_rk4 and self.time > 0:
+            self.logger.info(f"Spawning structure at time {self.time:.3f} and y0={y0:.3f}")
+
+            y0 += (random.random()-0.5) *self.rand_y0
+
+            x0_shift = jnp.exp(-1j*self.kx_2d*self.x0)
+            y0_shift = jnp.exp(-1j*self.ky_2d*y0)
+
+            Cx = 1/(2*self.sigma_x**2)
+            Gauss_x = jnp.sqrt(jnp.pi/Cx)*jnp.exp(-self.kx_2d**2 / (4*Cx))
+
+            Cy = 1/(2*self.sigma_y**2)
+            Gauss_y = jnp.sqrt(jnp.pi/Cy)*jnp.exp(-self.ky_2d**2 / (4*Cy))
+
+            Gauss_fourier = Gauss_x * Gauss_y * x0_shift * y0_shift * self.norm
+
+            fields["density_fft"] += self.ampl_n*Gauss_fourier
+
+            # Remove _spawn_structure from the inline operations to avoid multiple spawns
+            # self.inline_operations.remove(self._spawn_structure)
+
+        return fields

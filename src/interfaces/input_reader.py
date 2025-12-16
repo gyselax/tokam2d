@@ -14,9 +14,12 @@ class StaticParams:
         self.quiet = quiet
         if quiet: self.logger.setLevel("ERROR")
 
-        # Convert input yaml file to a dictionary
-        self.filepath = Path(filepath)
-        self.user = self.read_input()
+        if type(filepath) is dict: #RV 15/12/26
+            self.user = filepath
+        else:
+            # Convert input yaml file to a dictionary
+            self.filepath = Path(filepath)
+            self.user = self.read_input()
 
         # Ensure retrocompatibility with old input files and set default values
         self._ensure_retrocompatibility()
@@ -34,6 +37,21 @@ class StaticParams:
 
         # Prepare the wave numbers and set the precision
         self._prepare_wave_numbers()
+
+        # Complete the grid dictionnary
+        self.user['grid']['dx'] = self.dx
+        self.user['grid']['dy'] = self.dy
+        self.user['grid']['x_1d'] = self.x_1d
+        self.user['grid']['y_1d'] = self.y_1d
+        self.user['grid']['kx_1d'] = self.kx_1d
+        self.user['grid']['ky_1d'] = self.ky_1d
+        self.user['grid']['kx_2d'] = self.kx_2d
+        self.user['grid']['ky_2d'] = self.ky_2d
+        self.user['grid']['k2_2d'] = self.k2_2d
+        self.user['grid']['dkx'] = self.dkx
+        self.user['grid']['dky'] = self.dky
+
+        # Set the numerical precision
         self._set_precision()
 
         # Make the FFT mask

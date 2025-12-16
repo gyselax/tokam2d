@@ -1,4 +1,4 @@
-# src/model/services/pde.py
+# src/model/pde.py
 from src.model.source import Source
 
 from jax import jit
@@ -104,6 +104,16 @@ class SOL(PDE_structure):
         potential_fft_out = self.a_phi*potential_fft + self.b_phi*dens_fft + (nl_term_rhs_vort+Sphi_fft)*(-self.inv_k2_2d)
 
         return {"density_fft": dens_fft_out, "potential_fft": potential_fft_out}
+
+@register_pde("SOL_ZF")
+class SOL_ZF(SOL):
+    def __init__(self, params):
+        super().__init__(params)
+
+        self.b_n = self.sigma_nphi * np.ones_like(self.k2_2d)
+        self.a_n = self.a_n.at[0, :].set(self.dens_dissip[0, :])
+        self.b_n = self.b_n.at[0,:].set(0)
+        self.a_phi = self.a_phi.at[0, :].set(self.phi_dissip[0, :])
 
 @register_pde("HW")
 class HasegawaWakatani(PDE_structure):

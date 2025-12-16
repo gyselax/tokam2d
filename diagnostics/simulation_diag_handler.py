@@ -15,6 +15,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
 import imageio
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 # Map strings to operator functions
 operator_map = {
@@ -390,9 +391,10 @@ class Simulation:
 
     # Function to generate and save a single frame, optimized for parallel execution
     @staticmethod
+    @staticmethod
     def _save_frame(params):
         """Generate and save a single frame, optimized for parallel execution."""
-        for_IA, scheme, save_folder_path, acronym_simu, it, time_slice, data_slice, data_name, cmap, vmin, vmax = params
+        for_IA, scheme, save_folder_path, acronym_simu, it, time_slice, data_slice, data_name, cmap, vmin, vmax, Nx, Ny, dpi = params
         frame_name = f'{acronym_simu}_{data_name}_{it:05d}.png'
         filepath = os.path.join(Path(save_folder_path), frame_name)
         logging.info(f'Generating frame {it}')
@@ -400,22 +402,27 @@ class Simulation:
         if scheme=='HW': time_norm = '$[L/c_0]$'
         # Use BytesIO as an in-memory buffer, so that the disk is not accessed when generating the frames
         with io.BytesIO() as buf:
-            fig, ax = plt.subplots(figsize=(10, 10))
-            if vmin == None:
-                vmin = np.min(data_slice)
-            if vmax == None:
-                vmax = np.max(data_slice)
-            # p = ax.imshow(data_slice, cmap='plasma', extent=[0, self['Lx'], 0, self['Lx']], origin='lower', vmin=vmin, vmax=vmax)
-            p = ax.imshow(data_slice, cmap=cmap, origin='lower', vmin=vmin, vmax=vmax)
+            if Nx > Ny:
+                size_x = Nx / dpi
+                size_y = size_x * (Ny / Nx)
+            else:
+                size_y = Ny / dpi
+                size_x = size_y * (Nx / Ny)
+
+            fig, ax = plt.subplots(figsize=(size_x, size_y), dpi=dpi, layout='constrained')
+
+            if vmin == None: vmin = np.min(data_slice)
+            if vmax == None: vmax = np.max(data_slice)
+
+            p = ax.imshow(data_slice, cmap=cmap, origin='lower', vmin=vmin, vmax=vmax)#, aspect=aspect_ratio)
             if not for_IA:
-                cbar = fig.colorbar(p, fraction=0.046, pad=0.04)
+                divider = make_axes_locatable(ax)
+                cax = divider.append_axes("right", size="5%", pad=0.05)
+                cbar = fig.colorbar(p, cax=cax)
                 cbar.ax.yaxis.set_major_formatter(FuncFormatter(lambda x, _: f'{x:.2e}'))
-                # ax.set_title(f'Time = {time_slice:.2f} $[\\omega_{{c0}}^{{-1}}]$')
-                # ax.set_title(f'{data_name.capitalize()} at time = {time_slice:.2f} $[\\omega_{{c0}}^{{-1}}]$')
                 ax.set_title(f'{data_name.capitalize()} at time = {time_slice:.2f} {time_norm}')
                 ax.set_xlabel(r'x $[\rho_0]$')
                 ax.set_ylabel(r'y $[\rho_0]$')
-                fig.subplots_adjust(left=0.15, bottom=0.15, right=0.85, top=0.85)
             else:
                 ax.axis('off')
             fig.savefig(buf, format='png')
@@ -425,14 +432,15 @@ class Simulation:
                 f.write(buf.getvalue())
         return filepath
 
+
     # Function to generate and save frames, with optional parallel execution
-    def _generate_and_save_frames(self, parallel, num_cores, for_IA, scheme, save_folder_path, acronym_simu, time_frames, data_frames, data_name, cmap, vmin=None, vmax=None):
+    def _generate_and_save_frames(self, parallel, num_cores, for_IA, scheme, save_folder_path, acronym_simu, time_frames, data_frames, data_name, cmap, vmin=None, vmax=None, Nx=256, Ny=256, dpi=128):
         """Generate and save frames, with optional parallel execution."""
         frames = []
         logging.info(f"Running in parallel using {num_cores} cores.")
         save_folder_path_frame = Path(save_folder_path)/f'{acronym_simu}_{data_name}_frames'
         save_folder_path_frame.mkdir(parents=True, exist_ok=True)
-        args = [(for_IA, scheme, save_folder_path_frame, acronym_simu, it, time_slice, data_frames[it, :, :], data_name, cmap, vmin, vmax) for it, time_slice in enumerate(time_frames)]
+        args = [(for_IA, scheme, save_folder_path_frame, acronym_simu, it, time_slice, data_frames[it, :, :], data_name, cmap, vmin, vmax, Nx, Ny, dpi) for it, time_slice in enumerate(time_frames)]
 
         if parallel:
             with ProcessPoolExecutor(max_workers=num_cores) as executor:
@@ -440,7 +448,7 @@ class Simulation:
 
         else:
             for it, time_slice in enumerate(time_frames):
-                frames.append(_save_frame(args[it]))
+                frames.append(self._save_frame(args[it]))
 
         return frames
 
@@ -498,8 +506,16 @@ class Simulation:
             data_frames = field
             field = custom_field_name # Name for the custom field
 
+        Nx = self.Nx
+        Ny = self.Ny
+        dpi = max(Nx,Ny)/12
+        
+        plt.rcParams.update({'font.size': 16 * (100 / dpi)})
+        plt.rcParams.update({'axes.titlesize': 16 * (100 / dpi)})
+        plt.rcParams.update({'axes.labelsize': 16 * (100 / dpi)})
+
         # Generate frames using the data already loaded into memory
-        frames = self._generate_and_save_frames(parallel, num_cores, for_IA, scheme, path, filename, time_frames, data_frames, field, cmap, vmin, vmax)
+        frames = self._generate_and_save_frames(parallel, num_cores, for_IA, scheme, path, filename, time_frames, data_frames, field, cmap, vmin, vmax, Nx, Ny, dpi)
 
         # Compile the movie from the generated frames
         self._compile_movie(f'{filename}_{field}_movie', frames, path, fps)

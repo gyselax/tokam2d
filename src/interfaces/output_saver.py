@@ -104,7 +104,7 @@ class OutputSaver:
         """Copy the input file to the output folder."""
         try:
             if params.filepath is not None and params.filepath.exists():
-                shutil.copy(params.filepath, self.output_folder / params.filepath.name)
+                shutil.copy(params.filepath, self.output_folder / "input.yaml")
         except Exception as e:
             self.logger.error(f"Unable to copy input file to output folder: {e}")
 
