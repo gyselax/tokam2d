@@ -1,4 +1,4 @@
-# src/model/services/pde.py
+# src/model/pde.py
 from src.model.source import Source
 
 from jax import jit
