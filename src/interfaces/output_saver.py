@@ -123,11 +123,12 @@ class OutputSaver:
         Path(output_folder).mkdir(parents=True, exist_ok=True)
         return Path(output_folder)
 
-    def save_output(self, fields, step, t):
+    def save_output(self, fields, step, t, overwrite=False):
         with h5.File(self.output_folder / f'fields_{step:05d}.h5', 'a') as f:
             for field in fields:
+                if overwrite and (field in f):
+                    del f[field]
                 f.create_dataset(field, data=fields[field])
-            # f.create_dataset('time', data=t)
             f.require_dataset('time', shape=(), dtype='f', data=t)
 
     def save_output_data_file(self, erase_files=True):
