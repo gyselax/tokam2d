@@ -2,6 +2,7 @@
 import yaml
 import jax.numpy as np
 from pathlib import Path
+import copy
 
 #TODO: Unsatisfactoty: an IO module calling a core module, to be refactored
 from src.model.pde import PDE_REGISTRY
@@ -15,11 +16,13 @@ class StaticParams:
         if quiet: self.logger.setLevel("ERROR")
 
         if type(filepath) is dict: #RV 15/12/26
-            self.user = filepath
+            # self.user = filepath
+            self.user = copy.deepcopy(filepath)
         else:
             # Convert input yaml file to a dictionary
             self.filepath = Path(filepath)
-            self.user = self.read_input()
+            self.user = copy.deepcopy(self.read_input())
+            # self.user = self.read_input()
 
         # Ensure retrocompatibility with old input files and set default values
         self._ensure_retrocompatibility()
@@ -111,7 +114,7 @@ class StaticParams:
 
         self.k2_2d = self.kx_2d*self.kx_2d + self.ky_2d*self.ky_2d
 
-        k2_2d_star = self.k2_2d.at[0, 0].set(1)
+        k2_2d_star = self.k2_2d.at[0, 0].set(1.)
 
         self.inv_k2_2d = 1/k2_2d_star
 

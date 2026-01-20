@@ -105,6 +105,8 @@ class SimulationRunner:
         self._init_inline_operations()
         self._init_inline_display()
 
+        self.crash = False
+
     def run(self, fields):
         """
         Run the simulation for Nt_rk4 steps, calling callbacks and inline operations
@@ -200,6 +202,7 @@ class SimulationRunner:
             self.logger.critical("\n !!! NUMERICAL CRASH !!!\n")
             self.logger.critical("NaNs detected in field data. Stopping the simulation properly...")
             self._stop = True
+            self.crash = True
 
     # Inline operations
     def _apply_fft_mask(self, fields):

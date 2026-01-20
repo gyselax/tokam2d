@@ -115,10 +115,16 @@ class OutputSaver:
 
         # If file exist, add _1, _2, etc. to the name
         i = 2
-        while output_folder.exists():
-            print(f"Output folder {output_folder} already exists. Renaming to {output_folder}_{i}...")
-            output_folder = output_folder.parent / (output_folder.name + f"_{i}")
+        
+        output_folder_temp = output_folder
+        while output_folder_temp.exists(): 
+            output_folder_temp = output_folder.parent / (output_folder.name + f"_{i}")
             i += 1
+
+        if i > 1:
+            print(f"Output folder {output_folder} already exists. Renaming to {output_folder_temp}...")
+    
+        output_folder = output_folder_temp
 
         Path(output_folder).mkdir(parents=True, exist_ok=True)
         return Path(output_folder)

@@ -35,16 +35,14 @@ class Simulation:
     # TODO(RV): Fix behaviour when an instantiation fails and leaves a broken instance in the cache
     _cache = {}
 
-    def __new__(cls, myparam):
-        if myparam in cls._cache:
-            return cls._cache[myparam]
+    def __new__(cls, sim_data_path, force_init=False):
+        if sim_data_path not in cls._cache or force_init:
+            instance = super(Simulation, cls).__new__(cls)
+            cls._cache[sim_data_path] = instance
+        return cls._cache[sim_data_path]
 
-        instance = super().__new__(cls)
-        cls._cache[myparam] = instance
-        return instance
-
-    def __init__(self, sim_data_path) -> None:
-        if not hasattr(self, "_initialized"):
+    def __init__(self, sim_data_path, force_init=False) -> None:
+        if not hasattr(self, "_initialized") or force_init:
             self._initialized = True
             
             self.sim_folder_path = Path(sim_data_path)
@@ -375,22 +373,36 @@ class Simulation:
         ky_norm = 2*np.pi/np.array(y[-1])
         return np.fft.ifftshift(ky_norm*(ygrid - len(y)/2))
 
-    def export_to_h5(self, field, path=None, filename=None, it=None, ix=None, iy=None):
+    def export_to_h5(self, field, path=None, filename=None, it=None, ix=None, iy=None, save_grid=False):
         """Export a specific field to an HDF5 file.
 
         Supports exporting a full 3D array, a time step, or a spatial slice.
         """
         if path is None:
             path = self.sim_folder_path
+        
+        field_name = ''
+        for val in (field if isinstance(field, list) else [field]):
+            field_name += f"{val}_"
+        field_name = field_name[:-1] 
+
         if filename is None:
-            filename = f"{field}_{self.name}.h5"
-        with h5py.File(path/filename, "w") as f:
-            data = self.get_data_slice(field, it, iy, ix)
-            f.create_dataset(field, data=data)
-        print(f"Exported {field} to {path/filename}.")
+            filename = f"{field_name}_{self.name}.h5"
+
+        with h5py.File(path/filename, "a") as f:
+            for val in (field if isinstance(field, list) else [field]):
+                data = self.get_data_slice(val, it, iy, ix)
+                f.create_dataset(val, data=data)
+
+        if save_grid:
+            with h5py.File(path/filename, "a") as f:
+                f.create_dataset("x", data=self.x)
+                f.create_dataset("y", data=self.y)
+                f.create_dataset("time", data=self.time)
+
+        print(f"Exported {field_name} to {path/filename}.")
 
     # Function to generate and save a single frame, optimized for parallel execution
-    @staticmethod
     @staticmethod
     def _save_frame(params):
         """Generate and save a single frame, optimized for parallel execution."""
@@ -535,7 +547,7 @@ def set_plot_defaults() -> None:
     """Set default plotting parameters."""
     plt.rcParams.update({
         "image.cmap": "Spectral_r",
-        "axes.formatter.limits": (-3, 3),
+        "axes.formatter.limits": (-4, 4),
         "lines.linewidth": 2.5,
         "axes.grid": True,
         "lines.markersize": 8,
