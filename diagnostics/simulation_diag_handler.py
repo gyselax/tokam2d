@@ -437,6 +437,7 @@ class Simulation:
                 ax.set_ylabel(r'y $[\rho_0]$')
             else:
                 ax.axis('off')
+            fig.tight_layout()
             fig.savefig(buf, format='png')
             plt.close(fig)  # Close the figure to free memory
             buf.seek(0)
