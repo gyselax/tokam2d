@@ -280,11 +280,12 @@ class StaticParams:
             ("source_gauss_sigma_x" , "source"         , [0.]),
             ("source_gauss_sigma_y" , "source"         , [0.]),
             # Inline operations
-            ("fft_filter"       , "inline_operations", True),
+            ("fft_filter"                , "inline_operations", True),
+            ("compute_time_derivatives"  , "inline_operations", False),
             # Callbacks
-            ("check_crash"       , "callbacks", True),
+            ("check_crash"     , "callbacks", True),
             ("save_real"       , "callbacks", True),
-            ("save_fft"       , "callbacks", False),
+            ("save_fft"        , "callbacks", False),
         ]
 
         def default(key, category, default_value):
