@@ -183,7 +183,7 @@ class SimulationRunner:
                 new_key = new_key.strip('_fft')
                 dt_real_fields_evol[new_key] = dt_real_fields_evol.pop(k)
 
-            step_for_output = int((self.step_rk4_count - 4)/self.dt_diag)
+            step_for_output = int((self.step_rk4_count - 4)/self.rk4_per_diag)
             self.saver.save_output(dt_real_fields_evol, 
                                 step=step_for_output, 
                                 t=self.time - 4*self.dt_rk4,
