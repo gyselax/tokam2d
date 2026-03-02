@@ -198,3 +198,120 @@ class fluxBalancedHasegawaWakatani(modifiedHasegawaWakatani):
         potential_fft_out = (self.a_phi*potential_fft + self.b_phi*dens_fft + nl_term_rhs_vort*(-self.inv_k2_2d))
 
         return {"density_fft": dens_fft_out, "potential_fft": potential_fft_out}
+    
+@register_pde("SOL_adim")
+class SOL(PDE_structure):
+    def __init__(self, params):
+        super().__init__(params)
+        self.Ra = params.user["pde"]["Ra"]
+        self.Pr = params.user["pde"]["Pr"]
+        self.Sigma = params.user["pde"]["Sigma"]
+
+        #TODO: reimplement gradn
+        self.a_n = - self.k2_2d / self.Pr
+        self.b_n = 0.
+        self.a_phi = - self.k2_2d - self.inv_k2_2d*self.Sigma
+        self.b_phi = self.inv_k2_2d * 1j * self.ky_2d * self.Ra / self.Pr
+
+        self.b_phi = self.b_phi.at[0, :].set(0)
+
+        # Source
+        self.source = Source(params)
+        self.source_dict = self.source.get_source()
+
+    @partial(jit, static_argnums=(0,))
+    def compute_rhs(self, state, t=None):
+        # t could be removed
+        potential_fft = state["potential_fft"]
+        dens_fft = state["density_fft"]
+
+        Sn_fft = self.source_dict["density_source_fft"]
+        Sphi_fft = self.source_dict["potential_source_fft"]
+
+        dens = np.real(np.fft.ifft2(dens_fft))
+        vort = np.real(np.fft.ifft2(- self.k2_2d*potential_fft))
+        vEx = - np.real(np.fft.ifft2(1j*self.ky_2d*potential_fft))
+        vEy = np.real(np.fft.ifft2(1j*self.kx_2d*potential_fft))
+
+        nl_term_rhs_dens = - poisson_bracket(
+            dens, vEx, vEy, 1j*self.kx_2d, 1j*self.ky_2d)
+        nl_term_rhs_vort = - poisson_bracket(
+            vort, vEx, vEy, 1j*self.kx_2d, 1j*self.ky_2d)
+
+        dens_fft_out      = self.a_n*dens_fft + self.b_n*potential_fft + nl_term_rhs_dens + Sn_fft
+        potential_fft_out = self.a_phi*potential_fft + self.b_phi*dens_fft + (nl_term_rhs_vort+Sphi_fft)*(-self.inv_k2_2d)
+
+        return {"density_fft": dens_fft_out, "potential_fft": potential_fft_out}
+    
+@register_pde("SOL_lin")
+class SOL(PDE_structure):
+    def __init__(self, params):
+        super().__init__(params)
+        self.sigma_nn = params.user["pde"]["sigma_nn"]
+        self.sigma_nphi = params.user["pde"]["sigma_nphi"]
+        self.sigma_phin = params.user["pde"]["sigma_phin"]
+        self.sigma_phiphi = params.user["pde"]["sigma_phiphi"]
+        self.g = params.user["pde"]["g"]
+
+        #TODO: reimplement gradn
+        self.a_n = self.dens_dissip - self.sigma_nn
+        self.b_n = self.sigma_nphi
+        self.a_phi = self.phi_dissip - self.inv_k2_2d*self.sigma_phiphi
+        self.b_phi = -self.inv_k2_2d*(- 1j*self.ky_2d*self.g - self.sigma_phin)
+
+        self.b_phi = self.b_phi.at[0, :].set(0)
+
+        # Source
+        self.source = Source(params)
+        self.source_dict = self.source.get_source()
+
+    @partial(jit, static_argnums=(0,))
+    def compute_rhs(self, state, t=None):
+        # t could be removed
+        potential_fft = state["potential_fft"]
+        dens_fft = state["density_fft"]
+
+        Sn_fft = self.source_dict["density_source_fft"]
+        Sphi_fft = self.source_dict["potential_source_fft"]
+
+        dens_fft_out      = self.a_n*dens_fft + self.b_n*potential_fft + Sn_fft
+        potential_fft_out = self.a_phi*potential_fft + self.b_phi*dens_fft + (Sphi_fft)*(-self.inv_k2_2d)
+
+        return {"density_fft": dens_fft_out, "potential_fft": potential_fft_out}
+    
+@register_pde("drifting_flow")
+class SOL(PDE_structure):
+    def __init__(self, params):
+        super().__init__(params)
+        self.VEy = params.user["pde"]["g"]
+
+        #TODO: reimplement gradn
+        self.a_n = np.zeros_like(self.k2_2d)
+        # self.a_n = (- 1j*self.ky_2d)*(- 1j*self.kx_2d)*self.VEy
+
+        # self.b_phi = self.b_phi.at[0, :].set(0)
+
+        # self.a_n = self.a_n.at[2, :].set( (- 1j*self.ky_2d[2, :])*(self.kx_2d[2, :])*self.VEy  )
+        # self.a_n = self.a_n.at[128, :].set(- 1j*self.ky_2d[128, :]*self.VEy)
+
+        # Source
+        self.source = Source(params)
+        self.source_dict = self.source.get_source()
+
+    @partial(jit, static_argnums=(0,))
+    def compute_rhs(self, state, t=None):
+        # t could be removed
+        potential_fft = state["potential_fft"]
+        dens_fft = state["density_fft"]
+
+        dens = np.real(np.fft.ifft2(dens_fft))
+        vEx = - np.real(np.fft.ifft2(1j*self.ky_2d*potential_fft))
+        vEy = np.real(np.fft.ifft2(1j*self.kx_2d*potential_fft))
+
+        nl_term_rhs_dens = - poisson_bracket(
+            dens, vEx, vEy, 1j*self.kx_2d, 1j*self.ky_2d)
+
+        dens_fft_out      = nl_term_rhs_dens
+        potential_fft_out = potential_fft
+
+        return {"density_fft": dens_fft_out, "potential_fft": potential_fft_out}

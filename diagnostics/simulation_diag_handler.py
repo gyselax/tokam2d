@@ -240,6 +240,10 @@ class Simulation:
             return np.fft.fft2(self["potential"][it_slice], axes=(-2, -1))[..., y_slice, x_slice]
         if field == "density_fft":
             return np.fft.fft2(self["density"][it_slice], axes=(-2, -1))[..., y_slice, x_slice]
+        if field == "dt_potential_fft":
+            return np.fft.fft2(self["dt_potential"][it_slice], axes=(-2, -1))[..., y_slice, x_slice]
+        if field == "dt_density_fft":
+            return np.fft.fft2(self["dt_density"][it_slice], axes=(-2, -1))[..., y_slice, x_slice]
 
         # If the name of the field is not in the mapping, raise an error
         if field not in self.field_mapping:
@@ -268,6 +272,8 @@ class Simulation:
         """Convert a real field key to its corresponding FFT key."""
         if field_key in ["density","n"]: field_key = "density_fft"
         elif field_key in ["potential","phi"]: field_key = "potential_fft"
+        elif field_key in ["dt_density","dt_n"]: field_key = "dt_density_fft"
+        elif field_key in ["dt_potential","dt_phi"]: field_key = "dt_potential_fft"
         return field_key
 
     @staticmethod
@@ -406,7 +412,7 @@ class Simulation:
     @staticmethod
     def _save_frame(params):
         """Generate and save a single frame, optimized for parallel execution."""
-        for_IA, scheme, save_folder_path, acronym_simu, it, time_slice, data_slice, data_name, cmap, vmin, vmax, Nx, Ny, dpi = params
+        for_IA, scheme, save_folder_path, acronym_simu, it, time_slice, data_slice, data_name, cmap, vmin, vmax, Lx, Ly, dpi, fig_scale = params
         frame_name = f'{acronym_simu}_{data_name}_{it:05d}.png'
         filepath = os.path.join(Path(save_folder_path), frame_name)
         logging.info(f'Generating frame {it}')
@@ -414,14 +420,19 @@ class Simulation:
         if scheme=='HW': time_norm = '$[L/c_0]$'
         # Use BytesIO as an in-memory buffer, so that the disk is not accessed when generating the frames
         with io.BytesIO() as buf:
-            if Nx > Ny:
-                size_x = Nx / dpi
-                size_y = size_x * (Ny / Nx)
+            aspect_ratio = Lx / Ly
+            if Lx > Ly:
+                # size_x = Nx / dpi
+                # size_y = size_x * (Ny / Nx)
+                size_y = 12
+                size_x = size_y * aspect_ratio
             else:
-                size_y = Ny / dpi
-                size_x = size_y * (Nx / Ny)
-
-            fig, ax = plt.subplots(figsize=(size_x, size_y), dpi=dpi, layout='constrained')
+                # size_y = Ny / dpi
+                # size_x = size_y * (Nx / Ny)
+                size_x = 12
+                size_y = size_x / aspect_ratio
+            # fig, ax = plt.subplots(figsize=(fig_scale*size_x, fig_scale*size_y), dpi=dpi)#, layout='constrained')
+            fig, ax = plt.subplots(figsize=(fig_scale*size_x, fig_scale*size_y), dpi=dpi)#, layout='constrained')
 
             if vmin == None: vmin = np.min(data_slice)
             if vmax == None: vmax = np.max(data_slice)
@@ -447,13 +458,13 @@ class Simulation:
 
 
     # Function to generate and save frames, with optional parallel execution
-    def _generate_and_save_frames(self, parallel, num_cores, for_IA, scheme, save_folder_path, acronym_simu, time_frames, data_frames, data_name, cmap, vmin=None, vmax=None, Nx=256, Ny=256, dpi=128):
+    def _generate_and_save_frames(self, parallel, num_cores, for_IA, scheme, save_folder_path, acronym_simu, time_frames, data_frames, data_name, cmap, vmin=None, vmax=None, Lx=256, Ly=256, dpi=128, fig_scale=1):
         """Generate and save frames, with optional parallel execution."""
         frames = []
         logging.info(f"Running in parallel using {num_cores} cores.")
         save_folder_path_frame = Path(save_folder_path)/f'{acronym_simu}_{data_name}_frames'
         save_folder_path_frame.mkdir(parents=True, exist_ok=True)
-        args = [(for_IA, scheme, save_folder_path_frame, acronym_simu, it, time_slice, data_frames[it, :, :], data_name, cmap, vmin, vmax, Nx, Ny, dpi) for it, time_slice in enumerate(time_frames)]
+        args = [(for_IA, scheme, save_folder_path_frame, acronym_simu, it, time_slice, data_frames[it, :, :], data_name, cmap, vmin, vmax, Lx, Ly, dpi, fig_scale) for it, time_slice in enumerate(time_frames)]
 
         if parallel:
             with ProcessPoolExecutor(max_workers=num_cores) as executor:
@@ -476,7 +487,7 @@ class Simulation:
                 writer.append_data(imageio.imread(frame_path))
         logging.info(f'Movie {title} created successfully at {save_folder_path}!')
 
-    def make_movie(self, field, path=None, filename=None, it_slice=None, parallel=True, num_cores=None, for_IA=False, scheme=False, cmap='plasma', vmin=None, vmax=None, fps=30, save_frames=False, custom_field_name='custom_field'):
+    def make_movie(self, field, path=None, filename=None, it_slice=None, parallel=True, num_cores=None, for_IA=False, scheme=False, cmap='plasma', vmin=None, vmax=None, fps=30, save_frames=False, custom_field_name='custom_field', fig_scale=1):
         """Generate a movie for a specific field.
 
         Optional parallel execution.
@@ -519,16 +530,21 @@ class Simulation:
             data_frames = field
             field = custom_field_name # Name for the custom field
 
-        Nx = self.Nx
-        Ny = self.Ny
-        dpi = max(Nx,Ny)/12
+        # Nx = self.Nx
+        # Ny = self.Ny
+        Lx = self.Lx
+        Ly = self.Ly
+        # dpi = max(Nx,Ny)/12
+        dpi = 128.
+        # dpi = (Nx**2+Ny**2)**0.5/12
+        # dpi = ((Nx**2+Ny**2)**0.5)*1
         
-        plt.rcParams.update({'font.size': 16 * (100 / dpi)})
-        plt.rcParams.update({'axes.titlesize': 16 * (100 / dpi)})
-        plt.rcParams.update({'axes.labelsize': 16 * (100 / dpi)})
+        plt.rcParams.update({'font.size': 14 * (100 / dpi)})
+        plt.rcParams.update({'axes.titlesize': 14 * (100 / dpi)})
+        plt.rcParams.update({'axes.labelsize': 14 * (100 / dpi)})
 
         # Generate frames using the data already loaded into memory
-        frames = self._generate_and_save_frames(parallel, num_cores, for_IA, scheme, path, filename, time_frames, data_frames, field, cmap, vmin, vmax, Nx, Ny, dpi)
+        frames = self._generate_and_save_frames(parallel, num_cores, for_IA, scheme, path, filename, time_frames, data_frames, field, cmap, vmin, vmax, Lx, Ly, dpi, fig_scale)
 
         # Compile the movie from the generated frames
         self._compile_movie(f'{filename}_{field}_movie', frames, path, fps)
