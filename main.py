@@ -21,7 +21,7 @@ def main():
 
     # 1) Read the input file
     print("\n\033[0;32m --- Reading input file, setting simulation domain... ---\n\033[0m")
-    input_path, save_dir = get_input_path_and_output_folder()
+    input_path, save_dir, make_movie = get_input_path_and_output_folder_and_movie_bool()
     params = StaticParams(input_path)
     params.logger.info(params)
 
@@ -50,7 +50,18 @@ def main():
     print("Simulation complete.")
     print(f'Outputs saved in {saver.output_folder}')
 
-def get_input_path_and_output_folder():
+    if make_movie:
+        from diagnostics.simulation_diag_handler import Simulation
+        print("Making movie.")
+
+        print(f"DEBUG: fields: {make_movie}")
+
+        sim = Simulation(str(save_dir))
+
+        sim.make_movie(field='density', path=None, filename=save_dir.name, it_slice=None, parallel=True, num_cores=None, for_IA=False, scheme=None, cmap='RdYlBu_r', vmin=None, vmax=None, fps=30, save_frames=False, fig_scale=1)
+        sim.make_movie(field='potential', path=None, filename=save_dir.name, it_slice=None, parallel=True, num_cores=None, for_IA=False, scheme=None, cmap='RdYlBu_r', vmin=None, vmax=None, fps=30, save_frames=False, fig_scale=1)
+
+def get_input_path_and_output_folder_and_movie_bool():
     parser = ArgumentParser(description="Run TOKAM2D")
     parser.add_argument("-i","--input_file",
                         action="store",
@@ -64,12 +75,19 @@ def get_input_path_and_output_folder():
                         default=None,
                         type=Path,
                         help="output folder")
+    parser.add_argument("-m","--make_movie",
+                        # nargs='+',
+                        action="store_true",
+                        # default="density",
+                        # type=str,
+                        help="make a movie of the simulation")
+
     args = parser.parse_args()
 
     if args.input_file is None:
         raise ValueError("No input file provided.")
 
-    return args.input_file, args.output_folder
+    return args.input_file, args.output_folder, args.make_movie
 
 if __name__ == "__main__":
 
