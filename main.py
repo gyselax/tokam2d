@@ -50,7 +50,7 @@ def main():
     print("Simulation complete.")
     print(f'Outputs saved in {saver.output_folder}')
 
-    if make_movie:
+    if make_movie and not sim_runner.crash:
         from diagnostics.simulation_diag_handler import Simulation
         print("Making movie.")
 
