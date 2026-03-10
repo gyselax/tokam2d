@@ -412,7 +412,7 @@ class Simulation:
     @staticmethod
     def _save_frame(params):
         """Generate and save a single frame, optimized for parallel execution."""
-        for_IA, scheme, save_folder_path, acronym_simu, it, time_slice, data_slice, data_name, cmap, vmin, vmax, Lx, Ly, dpi, fig_scale = params
+        for_IA, scheme, save_folder_path, acronym_simu, it, time_slice, data_slice, data_name, cmap, vmin, vmax, Lx, Ly, dpi, fig_scale, contour_bool, contour_field, contour_levels = params
         frame_name = f'{acronym_simu}_{data_name}_{it:05d}.png'
         filepath = os.path.join(Path(save_folder_path), frame_name)
         logging.info(f'Generating frame {it}')
@@ -448,6 +448,17 @@ class Simulation:
                 ax.set_ylabel(r'y $[\rho_0]$')
             else:
                 ax.axis('off')
+
+            if contour_bool:
+                if contour_field is None: contour_field = data_slice
+                if contour_levels is None:
+                    contour_levels = np.linspace(np.min(contour_field), np.max(contour_field), 10)
+                # contour = ax.contour(contour_field, levels=contour_levels, colors='k', linewidths=0.5)
+                contours_levels_pos = [level for level in contour_levels if level > 0]
+                contours_levels_neg = [level for level in contour_levels if level <= 0]
+                contour_pos = ax.contour(contour_field, levels=contours_levels_pos, colors='r', linewidths=1.5)
+                contour_neg = ax.contour(contour_field, levels=contours_levels_neg, colors='b', linewidths=1.5)
+
             fig.tight_layout()
             fig.savefig(buf, format='png')
             plt.close(fig)  # Close the figure to free memory
@@ -458,19 +469,20 @@ class Simulation:
 
 
     # Function to generate and save frames, with optional parallel execution
-    def _generate_and_save_frames(self, parallel, num_cores, for_IA, scheme, save_folder_path, acronym_simu, time_frames, data_frames, data_name, cmap, vmin=None, vmax=None, Lx=256, Ly=256, dpi=128, fig_scale=1):
+    def _generate_and_save_frames(self, parallel, num_cores, for_IA, scheme, save_folder_path, acronym_simu, time_frames, data_frames, data_name, cmap, vmin=None, vmax=None, Lx=256, Ly=256, dpi=128, fig_scale=1, contour_bool=False, contour_field=None, contour_levels=None):
         """Generate and save frames, with optional parallel execution."""
         frames = []
-        logging.info(f"Running in parallel using {num_cores} cores.")
         save_folder_path_frame = Path(save_folder_path)/f'{acronym_simu}_{data_name}_frames'
         save_folder_path_frame.mkdir(parents=True, exist_ok=True)
-        args = [(for_IA, scheme, save_folder_path_frame, acronym_simu, it, time_slice, data_frames[it, :, :], data_name, cmap, vmin, vmax, Lx, Ly, dpi, fig_scale) for it, time_slice in enumerate(time_frames)]
+        args = [(for_IA, scheme, save_folder_path_frame, acronym_simu, it, time_slice, data_frames[it, :, :], data_name, cmap, vmin, vmax, Lx, Ly, dpi, fig_scale, contour_bool, contour_field[it, :, :], contour_levels) for it, time_slice in enumerate(time_frames)]
 
         if parallel:
+            logging.info(f"Running in parallel using {num_cores} cores.")
             with ProcessPoolExecutor(max_workers=num_cores) as executor:
                 frames = list(executor.map(self._save_frame, args))
 
         else:
+            logging.warning("Parallel execution is off, run sequentially.")
             for it, time_slice in enumerate(time_frames):
                 frames.append(self._save_frame(args[it]))
 
@@ -487,7 +499,7 @@ class Simulation:
                 writer.append_data(imageio.imread(frame_path))
         logging.info(f'Movie {title} created successfully at {save_folder_path}!')
 
-    def make_movie(self, field, path=None, filename=None, it_slice=None, parallel=True, num_cores=None, for_IA=False, scheme=False, cmap='plasma', vmin=None, vmax=None, fps=30, save_frames=False, custom_field_name='custom_field', fig_scale=1):
+    def make_movie(self, field, path=None, filename=None, it_slice=None, parallel=True, num_cores=None, for_IA=False, scheme=False, cmap='plasma', vmin=None, vmax=None, fps=30, save_frames=False, custom_field_name='custom_field', fig_scale=1, contour_bool=False, contour_field=None, contour_levels=None):
         """Generate a movie for a specific field.
 
         Optional parallel execution.
@@ -530,21 +542,21 @@ class Simulation:
             data_frames = field
             field = custom_field_name # Name for the custom field
 
+        if (contour_field is not None) and (isinstance(contour_field, str)): 
+            contour_field = np.array(self.get_data_slice(contour_field, it=it_slice))
+
         # Nx = self.Nx
         # Ny = self.Ny
         Lx = self.Lx
         Ly = self.Ly
-        # dpi = max(Nx,Ny)/12
         dpi = 128.
-        # dpi = (Nx**2+Ny**2)**0.5/12
-        # dpi = ((Nx**2+Ny**2)**0.5)*1
         
         plt.rcParams.update({'font.size': 14 * (100 / dpi)})
         plt.rcParams.update({'axes.titlesize': 14 * (100 / dpi)})
         plt.rcParams.update({'axes.labelsize': 14 * (100 / dpi)})
 
         # Generate frames using the data already loaded into memory
-        frames = self._generate_and_save_frames(parallel, num_cores, for_IA, scheme, path, filename, time_frames, data_frames, field, cmap, vmin, vmax, Lx, Ly, dpi, fig_scale)
+        frames = self._generate_and_save_frames(parallel, num_cores, for_IA, scheme, path, filename, time_frames, data_frames, field, cmap, vmin, vmax, Lx, Ly, dpi, fig_scale, contour_bool, contour_field, contour_levels)
 
         # Compile the movie from the generated frames
         self._compile_movie(f'{filename}_{field}_movie', frames, path, fps)
