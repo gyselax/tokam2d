@@ -472,9 +472,13 @@ class Simulation:
     def _generate_and_save_frames(self, parallel, num_cores, for_IA, scheme, save_folder_path, acronym_simu, time_frames, data_frames, data_name, cmap, vmin=None, vmax=None, Lx=256, Ly=256, dpi=128, fig_scale=1, contour_bool=False, contour_field=None, contour_levels=None):
         """Generate and save frames, with optional parallel execution."""
         frames = []
+        # if contour_field==None: contour_field = data_frames
         save_folder_path_frame = Path(save_folder_path)/f'{acronym_simu}_{data_name}_frames'
         save_folder_path_frame.mkdir(parents=True, exist_ok=True)
-        args = [(for_IA, scheme, save_folder_path_frame, acronym_simu, it, time_slice, data_frames[it, :, :], data_name, cmap, vmin, vmax, Lx, Ly, dpi, fig_scale, contour_bool, contour_field[it, :, :], contour_levels) for it, time_slice in enumerate(time_frames)]
+        if contour_field is not None:
+            args = [(for_IA, scheme, save_folder_path_frame, acronym_simu, it, time_slice, data_frames[it, :, :], data_name, cmap, vmin, vmax, Lx, Ly, dpi, fig_scale, contour_bool, contour_field[it, :, :], contour_levels) for it, time_slice in enumerate(time_frames)]
+        else:
+            args = [(for_IA, scheme, save_folder_path_frame, acronym_simu, it, time_slice, data_frames[it, :, :], data_name, cmap, vmin, vmax, Lx, Ly, dpi, fig_scale, contour_bool, None, contour_levels) for it, time_slice in enumerate(time_frames)]
 
         if parallel:
             logging.info(f"Running in parallel using {num_cores} cores.")
