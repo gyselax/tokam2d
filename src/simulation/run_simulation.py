@@ -246,6 +246,7 @@ class SimulationRunner:
             self.logger.info("Density structure will be spawned during simulation...")
             self.inline_operations.append(self._spawn_structure)
 
+
     def _init_inline_display(self):
         # Display simulation progress
         self.inline_displays.append(self._display_progress)
@@ -283,26 +284,30 @@ class SimulationRunner:
     # Inline structure spawning
     def _spawn_structure(self, fields):
 
-        y0 = self.y0
-        if self.time%self.spawn_period < self.dt_rk4 and self.time > 0:
-            self.logger.info(f"Spawning structure at time {self.time:.3f} and y0={y0:.3f}")
+        y0_list = [self.y0] if not isinstance(self.y0, list) else self.y0
 
-            y0 += (random.random()-0.5) *self.rand_y0
+        for y0 in y0_list:
+            # if self.time%self.spawn_period < self.dt_rk4 and self.time > 0:
+            if self.time%self.spawn_period < self.dt_diag and self.time > 0:
+            
+                self.logger.info(f"Spawning structure at time {self.time:.3f} and y0={y0:.3f}")
 
-            x0_shift = jnp.exp(-1j*self.kx_2d*self.x0)
-            y0_shift = jnp.exp(-1j*self.ky_2d*y0)
+                y0 += (random.random()-0.5) *self.rand_y0
 
-            Cx = 1/(2*self.sigma_x**2)
-            Gauss_x = jnp.sqrt(jnp.pi/Cx)*jnp.exp(-self.kx_2d**2 / (4*Cx))
+                x0_shift = jnp.exp(-1j*self.kx_2d*self.x0)
+                y0_shift = jnp.exp(-1j*self.ky_2d*y0)
 
-            Cy = 1/(2*self.sigma_y**2)
-            Gauss_y = jnp.sqrt(jnp.pi/Cy)*jnp.exp(-self.ky_2d**2 / (4*Cy))
+                Cx = 1/(2*self.sigma_x**2)
+                Gauss_x = jnp.sqrt(jnp.pi/Cx)*jnp.exp(-self.kx_2d**2 / (4*Cx))
 
-            Gauss_fourier = Gauss_x * Gauss_y * x0_shift * y0_shift * self.norm
+                Cy = 1/(2*self.sigma_y**2)
+                Gauss_y = jnp.sqrt(jnp.pi/Cy)*jnp.exp(-self.ky_2d**2 / (4*Cy))
 
-            fields["density_fft"] += self.ampl_n*Gauss_fourier
+                Gauss_fourier = Gauss_x * Gauss_y * x0_shift * y0_shift * self.norm
 
-            # Remove _spawn_structure from the inline operations to avoid multiple spawns
-            # self.inline_operations.remove(self._spawn_structure)
+                fields["density_fft"] += self.ampl_n*Gauss_fourier
+
+                # Remove _spawn_structure from the inline operations to avoid multiple spawns
+                # self.inline_operations.remove(self._spawn_structure)
 
         return fields
