@@ -242,7 +242,11 @@ class Simulation:
             return np.fft.fft2(self["potential"][it_slice], axes=(-2, -1))[..., y_slice, x_slice]
         if field == "density_fft":
             return np.fft.fft2(self["density"][it_slice], axes=(-2, -1))[..., y_slice, x_slice]
-
+        if field == "dt_potential_fft":
+            return np.fft.fft2(self["dt_potential"][it_slice], axes=(-2, -1))[..., y_slice, x_slice]
+        if field == "dt_density_fft":
+            return np.fft.fft2(self["dt_density"][it_slice], axes=(-2, -1))[..., y_slice, x_slice]
+        
         # If the name of the field is not in the mapping, raise an error
         if field not in self.field_mapping:
             raise KeyError(f"Field {field} not found in mapping.")

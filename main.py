@@ -10,7 +10,7 @@ from src.interfaces.input_reader import StaticParams
 from src.interfaces.output_saver import OutputSaver
 
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 import time
 

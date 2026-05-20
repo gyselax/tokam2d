@@ -114,6 +114,8 @@ class SimulationRunner:
         while self.step_rk4_count < self.Nt_rk4 and not self._stop:
 
             if self.user_inline_operations.get('compute_time_derivatives', False):
+                for op in self.inline_operations:
+                    fields = op(fields)
                 self.inline_compute_time_derivative(fields)
 
             if self.step_rk4_count % self.rk4_per_diag == 0:
@@ -128,8 +130,9 @@ class SimulationRunner:
                 # Trigger inline operations (e.g. FFT filtering) at diagnostic time step
                 for op in self.inline_operations:
                     fields = op(fields)
-
+                    
                 self.step_diag_count += 1
+
             fields = step(fields, self.pde, self.dt_rk4, t=self.time)
 
             self.time += self.dt_rk4
