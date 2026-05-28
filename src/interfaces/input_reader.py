@@ -379,6 +379,13 @@ class StaticParams:
         def combine_str_blocks(str_a, str_b):
             return '\n'.join(map(str.__add__, str_a.split('\n'), str_b.split('\n')))
 
+        cpu_or_gpu = ""
+        import jax
+        # str(jax.devices())
+        cpu_or_gpu = str(jax.default_backend())
+        text_cpu_or_gpu = f"Running simulation on {cpu_or_gpu} \n\n"
+
+
         spatial_grid= handle_spaces(f"""
           -- Spatial grid --
 
@@ -417,7 +424,7 @@ class StaticParams:
             dt_diag = {self.rk4_per_diag} x dt_rk4 = {self.dt_diag:.2f}  and  Nt_diag = {self.Nt_diag}
         """)
 
-        return combine_str_blocks(spatial_grid, spectral_grid) + time_grid
+        return text_cpu_or_gpu + combine_str_blocks(spatial_grid, spectral_grid) + time_grid
 
 class TimeStepping():
     def __init__(self, params):
