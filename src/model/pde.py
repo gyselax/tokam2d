@@ -284,19 +284,49 @@ class SOL_adim(PDE_structure):
 class SOL_adim_ZF(SOL_adim):
     def __init__(self, params):
         super().__init__(params)
-
-        # self.a_n = self.a_n.at[0, :].set(self.dens_dissip[0, :])
-        # self.b_n = self.sigma_nphi * np.ones_like(self.k2_2d)
         self.a_phi = self.a_phi.at[0, :].set(- self.k2_2d[0, :])
-        # self.b_n = self.b_n.at[0,:].set(0)
 
 
-#     @register_pde("SOL_ZF")
-# class SOL_ZF(SOL):
-#     def __init__(self, params):
-#         super().__init__(params)
+@register_pde("SOL_adim_adapted_source")
+class SOL_adim(PDE_structure):
+    def __init__(self, params):
+        super().__init__(params)
+        self.Ra = params.user["pde"]["Ra"]
+        self.Pr = params.user["pde"]["Pr"]
+        self.Sigma = params.user["pde"]["Sigma"]
 
-#         self.b_n = self.sigma_nphi * np.ones_like(self.k2_2d)
-#         self.a_n = self.a_n.at[0, :].set(self.dens_dissip[0, :])
-#         self.b_n = self.b_n.at[0,:].set(0)
-#         self.a_phi = self.a_phi.at[0, :].set(self.phi_dissip[0, :])
+        #TODO: reimplement gradn
+        self.a_n = - self.k2_2d / self.Pr
+        self.b_n = 0.
+        self.a_phi = - self.k2_2d - self.inv_k2_2d*self.Sigma
+        self.b_phi = self.inv_k2_2d * 1j * self.ky_2d * self.Ra / self.Pr
+
+        self.b_phi = self.b_phi.at[0, :].set(0)
+
+        # Source
+        self.source = Source(params)
+        self.source_dict = self.source.get_source()
+
+    @partial(jit, static_argnums=(0,))
+    def compute_rhs(self, state, t=None):
+        # t could be removed
+        potential_fft = state["potential_fft"]
+        dens_fft = state["density_fft"]
+
+        Sn_fft = self.source_dict["density_source_fft"]
+        Sphi_fft = self.source_dict["potential_source_fft"]
+
+        dens = np.real(np.fft.ifft2(dens_fft))
+        vort = np.real(np.fft.ifft2(- self.k2_2d*potential_fft))
+        vEx = - np.real(np.fft.ifft2(1j*self.ky_2d*potential_fft))
+        vEy = np.real(np.fft.ifft2(1j*self.kx_2d*potential_fft))
+
+        nl_term_rhs_dens = - poisson_bracket(
+            dens, vEx, vEy, 1j*self.kx_2d, 1j*self.ky_2d)
+        nl_term_rhs_vort = - poisson_bracket(
+            vort, vEx, vEy, 1j*self.kx_2d, 1j*self.ky_2d)
+
+        dens_fft_out      = self.a_n*dens_fft + self.b_n*potential_fft + nl_term_rhs_dens + (Sn_fft/np.sqrt(self.Pr))
+        potential_fft_out = self.a_phi*potential_fft + self.b_phi*dens_fft + (nl_term_rhs_vort+Sphi_fft)*(-self.inv_k2_2d)
+
+        return {"density_fft": dens_fft_out, "potential_fft": potential_fft_out}
