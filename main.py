@@ -5,7 +5,6 @@ from pathlib import Path
 
 from src.simulation.initialize_fields import FieldInitiator
 from src.simulation.run_simulation import SimulationRunner
-from src.model.pde import HasegawaWakatani, modifiedHasegawaWakatani, fluxBalancedHasegawaWakatani, SOL
 from src.interfaces.input_reader import StaticParams
 from src.interfaces.output_saver import OutputSaver
 
@@ -29,11 +28,14 @@ def main():
     print("\033[0;32m --- Setting up output saver... ---\n\033[0m")
     saver = OutputSaver(params, save_dir)
 
+    print(params.unfinished_simulation_restart_iter)
+
     # 3) Initialize fields
     print("\n\033[0;32m --- Initializing fields... ---\n\033[0m")
     field_initiator = FieldInitiator(params)
     params.logger.info(field_initiator)
     initial_fields = field_initiator.initial_fields()
+
 
     # 4) Run the simulation
     print("\n\033[0;32m --- Running simulation... ---\n\033[0m")
@@ -53,8 +55,6 @@ def main():
     if make_movie and not sim_runner.crash:
         from diagnostics.simulation_diag_handler import Simulation
         print("Making movie.")
-
-        print(f"DEBUG: fields: {make_movie}")
 
         sim = Simulation(str(save_dir))
 

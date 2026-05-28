@@ -284,8 +284,16 @@ class SOL_adim(PDE_structure):
 class SOL_adim_ZF(SOL_adim):
     def __init__(self, params):
         super().__init__(params)
+
         self.a_phi = self.a_phi.at[0, :].set(- self.k2_2d[0, :])
 
+@register_pde("SOL_adim_adapted_source")
+class SOL_adim(PDE_structure):
+    def __init__(self, params):
+        super().__init__(params)
+        self.Ra = params.user["pde"]["Ra"]
+        self.Pr = params.user["pde"]["Pr"]
+        self.Sigma = params.user["pde"]["Sigma"]
 
 @register_pde("SOL_adim_adapted_source")
 class SOL_adim(PDE_structure):

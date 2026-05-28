@@ -39,14 +39,21 @@ class FieldInitiator():
         # Handle case where user provide custom initial density and potential
         self.bool_load_init = self.param_init.get('load_init_fields', False)
 
-    def _load_custom_init(self):
-        # Load custom initial fields from hdf5 file
+        # Get necessary parameters to handle unfinished simulation
+        self.unfinished_simulation_bool = params.unfinished_simulation_bool
+        self.unfinished_simulation_restart_iter = params.unfinished_simulation_restart_iter
+        if self.unfinished_simulation_bool:
+            self.unfinished_simulation_last_file_path = params.unfinished_simulation_last_file_path
+
+        params.time = self._initialize_time()
+
+    def _load_restart_init(self):
         from pathlib import Path
         custom_init_path = Path(self.param_init.get('load_init_path', None)) / "simulation_fields.h5"
-        if not custom_init_path.exists():
+        self.logger.info(f"Loading restart initial fields from {custom_init_path}")
+        if custom_init_path.exists():
             raise ValueError(f"load_init_fields set to True but path {custom_init_path} does not exist.")
-
-        self.logger.info(f"Loading custom initial fields from {custom_init_path}")
+        
         import h5py
         with h5py.File(custom_init_path, 'r') as f:
             if 'density_fft' in f.keys() and 'potential_fft' in f.keys():
@@ -61,6 +68,35 @@ class FieldInitiator():
                 raise ValueError("Custom initial fields file must contain either 'density_fft' and 'potential_fft' or 'density' and 'potential'.")
         self.density_fft_init = density_fft_init
         self.potential_fft_init = potential_fft_init
+
+    def _load_unfinished_simulation_init(self):
+        from pathlib import Path
+        self.logger.info(f"Loading last step of unfinished simulation from {self.unfinished_simulation_last_file_path}")
+        import h5py
+        with h5py.File(self.unfinished_simulation_last_file_path, 'r') as f:
+            if 'density_fft' in f.keys() and 'potential_fft' in f.keys():
+                density_fft_init = f['density_fft'][...]
+                potential_fft_init = f['potential_fft'][...]
+            elif 'density' in f.keys() and 'potential' in f.keys():
+                density_real_init = f['density'][...]
+                potential_real_init = f['potential'][...]
+                density_fft_init = np.fft.fft2(density_real_init)
+                potential_fft_init = np.fft.fft2(potential_real_init)
+        self.density_fft_init = density_fft_init
+        self.potential_fft_init = potential_fft_init
+
+        # Remove last file as it will be rewritten
+        self.unfinished_simulation_last_file_path.unlink()
+
+    def _initialize_time(self):
+        from pathlib import Path
+        time = 0.
+        if self.unfinished_simulation_bool:
+            if self.unfinished_simulation_last_file_path.exists():
+                import h5py
+                with h5py.File(self.unfinished_simulation_last_file_path, 'r') as f:
+                    time = f['time'][...]
+        return time
 
     def _uniform_fft_init(self):
         # Uniform initial parameters
@@ -146,7 +182,9 @@ class FieldInitiator():
     def initial_fields(self):
 
         if self.bool_load_init:
-            self._load_custom_init()
+            self._load_restart_init()
+        elif self.unfinished_simulation_restart_iter>0:
+            self._load_unfinished_simulation_init()
         else:
             self._uniform_fft_init()
             self._2D_gaussian_fft_init()
@@ -162,6 +200,10 @@ class FieldInitiator():
         if self.bool_load_init:
             load_path = self.param_init.get('load_init_path', None)
             repr_str += f"Custom initial fields loaded from folder: {load_path}\n"
+            return repr_str
+        
+        if self.unfinished_simulation_restart_iter>0:
+            repr_str += f"Unfinished simulation restarted from iteration: {self.unfinished_simulation_restart_iter}\n"
             return repr_str
 
         # Uniform initialization
