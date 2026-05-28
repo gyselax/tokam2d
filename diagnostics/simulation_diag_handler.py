@@ -85,6 +85,11 @@ class Simulation:
             self.simulation_duration = self["time"][-1] - self["time"][0]
             self.dt_diag = self.simulation_duration / len(self["time"])
 
+            self.eq = self["eq"][()]
+            # convert binary to string if needed
+            if type(self.eq) is bytes:
+                self.eq = self.eq.decode("utf-8")
+
             self.dt_RK4 = [self["dt_rk4"][()] if "dt_rk4" in self.sim_inputs else None][0]
 
             # Dictionnary of rule to compute new fields
@@ -412,23 +417,24 @@ class Simulation:
     @staticmethod
     def _save_frame(params):
         """Generate and save a single frame, optimized for parallel execution."""
-        for_IA, scheme, save_folder_path, acronym_simu, it, time_slice, data_slice, data_name, cmap, vmin, vmax, Lx, Ly, dpi, fig_scale, contour_bool, contour_field, contour_levels = params
+        for_IA, scheme, save_folder_path, acronym_simu, it, time_slice, data_slice, data_name, cmap, vmin, vmax, Lx, Ly, x, y, dpi, fig_scale, contour_bool, contour_field, contour_levels = params
         frame_name = f'{acronym_simu}_{data_name}_{it:05d}.png'
         filepath = os.path.join(Path(save_folder_path), frame_name)
         logging.info(f'Generating frame {it}')
         time_norm = '$[\\omega_{{c0}}^{{-1}}]$'
-        if scheme=='HW': time_norm = '$[L/c_0]$'
+        spatial_norm = r'$[\rho_0]$'
+        if scheme=='HW': 
+            time_norm = '$[L/c_0]$'
+        if scheme.startswith("SOL_adim"):
+            time_norm = '$[L^2/D_\phi]$'
+            spatial_norm = r'$[L]$'
         # Use BytesIO as an in-memory buffer, so that the disk is not accessed when generating the frames
         with io.BytesIO() as buf:
             aspect_ratio = Lx / Ly
             if Lx > Ly:
-                # size_x = Nx / dpi
-                # size_y = size_x * (Ny / Nx)
                 size_y = 12
                 size_x = size_y * aspect_ratio
             else:
-                # size_y = Ny / dpi
-                # size_x = size_y * (Nx / Ny)
                 size_x = 12
                 size_y = size_x / aspect_ratio
             # fig, ax = plt.subplots(figsize=(fig_scale*size_x, fig_scale*size_y), dpi=dpi)#, layout='constrained')
@@ -437,15 +443,17 @@ class Simulation:
             if vmin == None: vmin = np.min(data_slice)
             if vmax == None: vmax = np.max(data_slice)
 
-            p = ax.imshow(data_slice, cmap=cmap, origin='lower', vmin=vmin, vmax=vmax)#, aspect=aspect_ratio)
+            p = ax.imshow(data_slice, cmap=cmap, origin='lower', vmin=vmin, vmax=vmax, extent=(0, Lx, 0, Ly))
+
             if not for_IA:
                 divider = make_axes_locatable(ax)
                 cax = divider.append_axes("right", size="5%", pad=0.05)
                 cbar = fig.colorbar(p, cax=cax)
                 cbar.ax.yaxis.set_major_formatter(FuncFormatter(lambda x, _: f'{x:.2e}'))
-                ax.set_title(f'{data_name.capitalize()} at time = {time_slice:.2f} {time_norm}')
-                ax.set_xlabel(r'x $[\rho_0]$')
-                ax.set_ylabel(r'y $[\rho_0]$')
+                # ax.set_title(f'{data_name.capitalize()} at time = {time_slice:.2f} {time_norm}')
+                ax.set_title(f'{data_name} at time = {time_slice:.2f} {time_norm}')
+                ax.set_xlabel('x' + spatial_norm)
+                ax.set_ylabel('y' + spatial_norm)
             else:
                 ax.axis('off')
 
@@ -456,8 +464,8 @@ class Simulation:
                 # contour = ax.contour(contour_field, levels=contour_levels, colors='k', linewidths=0.5)
                 contours_levels_pos = [level for level in contour_levels if level > 0]
                 contours_levels_neg = [level for level in contour_levels if level <= 0]
-                contour_pos = ax.contour(contour_field, levels=contours_levels_pos, colors='r', linewidths=1.5)
-                contour_neg = ax.contour(contour_field, levels=contours_levels_neg, colors='b', linewidths=1.5)
+                contour_pos = ax.contour(x, y, contour_field, levels=contours_levels_pos, colors='r', linewidths=1.5)
+                contour_neg = ax.contour(x, y, contour_field, levels=contours_levels_neg, colors='b', linewidths=1.5)
 
             fig.tight_layout()
             fig.savefig(buf, format='png')
@@ -469,16 +477,16 @@ class Simulation:
 
 
     # Function to generate and save frames, with optional parallel execution
-    def _generate_and_save_frames(self, parallel, num_cores, for_IA, scheme, save_folder_path, acronym_simu, time_frames, data_frames, data_name, cmap, vmin=None, vmax=None, Lx=256, Ly=256, dpi=128, fig_scale=1, contour_bool=False, contour_field=None, contour_levels=None):
+    def _generate_and_save_frames(self, parallel, num_cores, for_IA, scheme, save_folder_path, acronym_simu, time_frames, data_frames, data_name, cmap, vmin=None, vmax=None, Lx=256, Ly=256, x=None, y=None, dpi=128, fig_scale=1, contour_bool=False, contour_field=None, contour_levels=None):
         """Generate and save frames, with optional parallel execution."""
         frames = []
         # if contour_field==None: contour_field = data_frames
         save_folder_path_frame = Path(save_folder_path)/f'{acronym_simu}_{data_name}_frames'
         save_folder_path_frame.mkdir(parents=True, exist_ok=True)
         if contour_field is not None:
-            args = [(for_IA, scheme, save_folder_path_frame, acronym_simu, it, time_slice, data_frames[it, :, :], data_name, cmap, vmin, vmax, Lx, Ly, dpi, fig_scale, contour_bool, contour_field[it, :, :], contour_levels) for it, time_slice in enumerate(time_frames)]
+            args = [(for_IA, scheme, save_folder_path_frame, acronym_simu, it, time_slice, data_frames[it, :, :], data_name, cmap, vmin, vmax, Lx, Ly, x, y, dpi, fig_scale, contour_bool, contour_field[it, :, :], contour_levels) for it, time_slice in enumerate(time_frames)]
         else:
-            args = [(for_IA, scheme, save_folder_path_frame, acronym_simu, it, time_slice, data_frames[it, :, :], data_name, cmap, vmin, vmax, Lx, Ly, dpi, fig_scale, contour_bool, None, contour_levels) for it, time_slice in enumerate(time_frames)]
+            args = [(for_IA, scheme, save_folder_path_frame, acronym_simu, it, time_slice, data_frames[it, :, :], data_name, cmap, vmin, vmax, Lx, Ly, x, y, dpi, fig_scale, contour_bool, None, contour_levels) for it, time_slice in enumerate(time_frames)]
 
         if parallel:
             logging.info(f"Running in parallel using {num_cores} cores.")
@@ -549,18 +557,19 @@ class Simulation:
         if (contour_field is not None) and (isinstance(contour_field, str)): 
             contour_field = np.array(self.get_data_slice(contour_field, it=it_slice))
 
-        # Nx = self.Nx
-        # Ny = self.Ny
         Lx = self.Lx
         Ly = self.Ly
         dpi = 128.
-        
+
         plt.rcParams.update({'font.size': 14 * (100 / dpi)})
         plt.rcParams.update({'axes.titlesize': 14 * (100 / dpi)})
         plt.rcParams.update({'axes.labelsize': 14 * (100 / dpi)})
 
+        # scheme = self.eq if scheme is False else scheme
+        scheme = self.eq
+
         # Generate frames using the data already loaded into memory
-        frames = self._generate_and_save_frames(parallel, num_cores, for_IA, scheme, path, filename, time_frames, data_frames, field, cmap, vmin, vmax, Lx, Ly, dpi, fig_scale, contour_bool, contour_field, contour_levels)
+        frames = self._generate_and_save_frames(parallel, num_cores, for_IA, scheme, path, filename, time_frames, data_frames, field, cmap, vmin, vmax, Lx, Ly, self.x, self.y, dpi, fig_scale, contour_bool, contour_field, contour_levels)
 
         # Compile the movie from the generated frames
         self._compile_movie(f'{filename}_{field}_movie', frames, path, fps)
