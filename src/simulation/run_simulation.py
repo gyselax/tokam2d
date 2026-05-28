@@ -105,8 +105,11 @@ class SimulationRunner:
         self.mask_fft = params.mask_fft
         self._save_real = self.user_callbacks.get('save_real', False)
         self._save_fft = self.user_callbacks.get('save_fft', False)
+        self._save_spatial_avg = self.user_callbacks.get('save_spatial_avg', False)
         self._save_text = self._save_real*'real' + (self._save_real&self._save_fft)*' and ' + self._save_fft*'fft'
-        
+        if self._save_spatial_avg:
+            and_bool = ((self._save_real&self._save_spatial_avg) or (self._save_fft&self._save_spatial_avg)) 
+            self._save_text += and_bool*' and ' + "spatial averages"
         self._init_callbacks()
         self._init_inline_operations()
         self._init_inline_display()
@@ -211,6 +214,11 @@ class SimulationRunner:
             self.logger.info("--> Enabling inline HDF5 saving of fields in fourier space...")
             self.callbacks.append(self._save_fft_data_callback)
 
+        # Enable inline HDF5 saving of fields in fourier space
+        if self._save_spatial_avg:
+            self.logger.info("--> Enabling inline HDF5 saving of spatial averages of fields...")
+            self.callbacks.append(self._save_spatial_avg_data_callback)
+
         # Enable crash checking
         if self.user_callbacks.get('check_crash', False):
             self.logger.info("--> Enabling crash checking...")
@@ -261,6 +269,16 @@ class SimulationRunner:
 
     def _save_fft_data_callback(self, fields):
         self.saver.save_output(fields, step=self.step_diag_count, t=self.time)
+
+    def _save_spatial_avg_data_callback(self, fields):
+        fields_avg = {}
+        # get averaged flux
+        density_fft = fields['density_fft']
+        potential_fft = fields['potential_fft']
+        VEx_fft = - self.grid["ky_2d"] * 1j * potential_fft
+        flux_real = jnp.fft.ifft2(density_fft).real * jnp.fft.ifft2(VEx_fft).real 
+        fields_avg['flux_avg'] = jnp.mean(flux_real)
+        self.saver.save_output(fields_avg, step=self.step_diag_count, t=self.time)
 
     def _check_crash_callback(self, fields):
         # Field is a dict of 2D array, we to check the first array
