@@ -90,6 +90,11 @@ class SimulationRunner:
         self.step_diag_count = 0
         self._stop = False
 
+        if params.unfinished_simulation_restart_iter > 0:
+            self.time = params.time
+            self.step_diag_count = params.unfinished_simulation_restart_iter
+            self.step_rk4_count = self.step_diag_count*self.rk4_per_diag
+
         # Retrieve mesh
         self.Nx = params.user["grid"]["Nx"]
         self.Ny = params.user["grid"]["Ny"]

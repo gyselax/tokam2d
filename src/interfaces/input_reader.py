@@ -74,6 +74,7 @@ class StaticParams:
         self.rk4_per_diag = self.user['time']['rk4_per_diag']
         self.dt_rk4 = self.user['time']['dt_rk4']
         self.dt_diag = self.user['time']['dt_diag']
+        self.time = 0
 
         #TODO: To be amended when restarting from a previous simulation
 

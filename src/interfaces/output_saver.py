@@ -71,6 +71,11 @@ class OutputSaver:
         # Create the output folder
         self.output_folder = self._make_output_folder(output_folder)
 
+        # Add output folder and unfinished simulation flag to param
+        params.unfinished_simulation_restart_iter = self.unfinished_simulation_restart_iter
+        params.unfinished_simulation_last_file_path = self.unfinished_simulation_last_file_path
+        params.unfinished_simulation_bool = self.unfinished_simulation_bool
+
         # Get the loader and set the stdout to the output folder
         self.logger = params.logger
         self._set_logger_output_file(params)
@@ -113,21 +118,54 @@ class OutputSaver:
             default_name = 'Tokam2Drun_'+get_simulation_date()
             output_folder = Path(__file__).parent.parent/default_name
 
+        self.unfinished_simulation_bool = False
+        self.unfinished_simulation_restart_iter = 0
+        self.unfinished_simulation_last_file_path = Path('')
+        if output_folder.exists():
+            # Check if at least one file fields_XXXXX.h5 exist
+            existing_files = self._handle_unfinished_sim_file(sorted(list(output_folder.glob("fields_*.h5"))))
+            if existing_files:
+                # self.unfinished_simulation_bool = True
+                self.unfinished_simulation_bool = True
+                self.unfinished_simulation_restart_iter = len(existing_files)-1
+                self.unfinished_simulation_last_file_path = existing_files[-1]
+                print(f"Output folder {output_folder} already exists and contains output files with last iteration {self.unfinished_simulation_restart_iter}.")
+                return Path(output_folder)
+
         # If file exist, add _1, _2, etc. to the name
         i = 2
         
         output_folder_temp = output_folder
-        while output_folder_temp.exists(): 
-            output_folder_temp = output_folder.parent / (output_folder.name + f"_{i}")
-            i += 1
+        if self.unfinished_simulation_restart_iter == 0:
+            while output_folder_temp.exists(): 
+                output_folder_temp = output_folder.parent / (output_folder.name + f"_{i}")
+                i += 1
 
-        if i > 1:
-            print(f"Output folder {output_folder} already exists. Renaming to {output_folder_temp}...")
-    
-        output_folder = output_folder_temp
+            if i > 1:
+                print(f"Output folder {output_folder} already exists. Renaming to {output_folder_temp}...")
+        
+            output_folder = output_folder_temp
 
-        Path(output_folder).mkdir(parents=True, exist_ok=True)
+            Path(output_folder).mkdir(parents=True, exist_ok=True)
         return Path(output_folder)
+
+    @staticmethod
+    def _handle_unfinished_sim_file(path_arr):
+        import h5py as h5
+        necessary_keys_real = ['density', 'potential', 'time']
+        necessary_fft_real = ['density_fft', 'potential_fft', 'time']
+
+        while len(path_arr)>0:
+            last_file_path = path_arr[-1]
+            with h5.File(last_file_path, 'r') as f:
+                valid = all(x in f.keys() for x in necessary_keys_real) or all(x in f.keys() for x in necessary_fft_real)
+                if valid:
+                    return path_arr
+                print(f"Output folder already exists but the last stored file do not contain the necessary keys for restarting the simulation. Starting a new simulation and erasing the existing files.")
+                path_arr=path_arr[:-1]
+                last_file_path.unlink()
+        raise Exception("Output folder already exists but do not contain any valid output file for restarting the simulation.")
+
 
     def save_output(self, fields, step, t, overwrite=False):
         with h5.File(self.output_folder / f'fields_{step:05d}.h5', 'a') as f:
