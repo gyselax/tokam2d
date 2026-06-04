@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tokam2d"
+version = "0.1.0"
+description = "Tokam2D: a 2D fluid turbulence mini-code (JAX)."
+requires-python = ">=3.11"
+# Core run-time deps shared by every backend. JAX is installed via a backend
+# extra (cpu/cuda/amd) since the right wheel is platform-specific.
+dependencies = ["numpy", "h5py", "h5netcdf", "pyyaml"]
+
+[project.optional-dependencies]
+# Backend extras (pick one), mirroring the former requirements_*.txt files.
+cpu = ["jax[cpu]"]
+cuda = ["jax[cuda12]"]
+amd = ["jax[rocm]"]
+# Post-processing / movie generation (diagnostics/).
+diagnostics = ["matplotlib", "imageio[ffmpeg]"]
+
+[project.scripts]
+tokam2d = "tokam2d.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

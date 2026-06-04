@@ -1,0 +1,10 @@
+# Byte-compiled / build artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Local simulation run outputs
+src/Tokam2Drun_*/
+*run_*/

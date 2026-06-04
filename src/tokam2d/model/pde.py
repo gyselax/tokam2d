@@ -1,5 +1,5 @@
 # src/model/pde.py
-from src.model.source import Source
+from tokam2d.model.source import Source
 
 from jax import jit
 import jax.numpy as np

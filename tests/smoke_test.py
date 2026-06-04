@@ -1,10 +1,10 @@
 from pathlib import Path
 
-from src.simulation.initialize_fields import FieldInitiator
-from src.simulation.run_simulation import SimulationRunner
-from src.model.pde import HasegawaWakatani, modifiedHasegawaWakatani, fluxBalancedHasegawaWakatani, SOL
-from src.interfaces.input_reader import StaticParams
-from src.interfaces.output_saver import OutputSaver
+from tokam2d.simulation.initialize_fields import FieldInitiator
+from tokam2d.simulation.run_simulation import SimulationRunner
+from tokam2d.model.pde import HasegawaWakatani, modifiedHasegawaWakatani, fluxBalancedHasegawaWakatani, SOL
+from tokam2d.interfaces.input_reader import StaticParams
+from tokam2d.interfaces.output_saver import OutputSaver
 
 import time
 
