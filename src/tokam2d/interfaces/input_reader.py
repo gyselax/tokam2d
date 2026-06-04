@@ -5,7 +5,7 @@ from pathlib import Path
 import copy
 
 #TODO: Unsatisfactoty: an IO module calling a core module, to be refactored
-from src.model.pde import PDE_REGISTRY
+from tokam2d.model.pde import PDE_REGISTRY
 
 class StaticParams:
     """Class to read the input file and set the simulation parameters."""
