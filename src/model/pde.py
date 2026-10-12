@@ -295,6 +295,14 @@ class SOL_adim(PDE_structure):
         self.Pr = params.user["pde"]["Pr"]
         self.Sigma = params.user["pde"]["Sigma"]
 
+@register_pde("SOL_adim_adapted_source")
+class SOL_adim(PDE_structure):
+    def __init__(self, params):
+        super().__init__(params)
+        self.Ra = params.user["pde"]["Ra"]
+        self.Pr = params.user["pde"]["Pr"]
+        self.Sigma = params.user["pde"]["Sigma"]
+
         #TODO: reimplement gradn
         self.a_n = - self.k2_2d / self.Pr
         self.b_n = 0.
@@ -326,7 +334,7 @@ class SOL_adim(PDE_structure):
         nl_term_rhs_vort = - poisson_bracket(
             vort, vEx, vEy, 1j*self.kx_2d, 1j*self.ky_2d)
 
-        dens_fft_out      = self.a_n*dens_fft + self.b_n*potential_fft + nl_term_rhs_dens + (Sn_fft/self.Pr)
+        dens_fft_out      = self.a_n*dens_fft + self.b_n*potential_fft + nl_term_rhs_dens + (Sn_fft/np.sqrt(self.Pr))
         potential_fft_out = self.a_phi*potential_fft + self.b_phi*dens_fft + (nl_term_rhs_vort+Sphi_fft)*(-self.inv_k2_2d)
 
         return {"density_fft": dens_fft_out, "potential_fft": potential_fft_out}
