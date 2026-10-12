@@ -68,6 +68,8 @@ class Simulation:
             self.ky2D = np.array(self.ky)[:,np.newaxis]*np.ones_like(self.kx)[np.newaxis,:]
             self.k2D  = np.sqrt(self.kx2D**2 + self.ky2D**2)
 
+            
+
             self.time = np.array(self["time"])
             self.t = self.time
             self.x = np.array(self["x"])
@@ -443,7 +445,8 @@ class Simulation:
             if vmin == None: vmin = np.min(data_slice)
             if vmax == None: vmax = np.max(data_slice)
 
-            p = ax.imshow(data_slice, cmap=cmap, origin='lower', vmin=vmin, vmax=vmax, extent=(0, Lx, 0, Ly))
+            # p = ax.imshow(data_slice, cmap=cmap, origin='lower', vmin=vmin, vmax=vmax, extent=(0, Lx, 0, Ly))
+            p = ax.pcolormesh(x, y, data_slice, cmap=cmap, vmin=vmin, vmax=vmax)
 
             if not for_IA:
                 divider = make_axes_locatable(ax)

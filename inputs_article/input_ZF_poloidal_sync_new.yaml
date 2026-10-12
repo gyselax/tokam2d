@@ -1,0 +1,80 @@
+callbacks:
+  check_crash: true
+  save_fft: false
+  save_real: true
+grid:
+  Lx: 10.0
+  Ly: 5.0
+  Nx: 1024
+  Ny: 512
+  x64_precision: false
+initial_condition:
+  init_gauss_ampl_n:
+  - 5.0
+  init_gauss_ampl_phi:
+  - 0.0
+  init_gauss_sigma_x:
+  - 0.1
+  init_gauss_sigma_y:
+  - 0.0
+  init_gauss_x0:
+  - 0.0
+  init_gauss_y0:
+  - 0.0
+  init_harm_ampl_n:
+  - 0.0
+  init_harm_ampl_phi:
+  - 0.0
+  init_harm_kx:
+  - 0
+  init_harm_ky:
+  - 12
+  init_rand_ampl_n: 0.0
+  init_rand_ampl_phi: 0.2
+  init_uni_ampl_n: 1.0
+  init_uni_ampl_phi: 0.0
+  load_init_fields: false
+  load_init_path: /lus/home/CT5/gen2224/rvarennes/work/multiple_jobs/outputs/ZF_adim_dummy_Pr_2.00E+01_dt_diag_5.00E-04
+inline_operations:
+  compute_time_derivatives: false
+  fft_filter: true
+pde:
+  C: 0.0
+  Dn:
+  - 0.01
+  Dphi:
+  - 0.5
+  HW_duration: 50.0
+  Pr: 25.0
+  Ra: 1000000.0
+  Sigma: 100000.0
+  dissipation_type:
+  - diffusion
+  eq: SOL_adim_ZF
+  g: 0.002
+  kappa: 0.0
+  sigma_nn: 6.1e-05
+  sigma_nphi: 0.0
+  sigma_phin: 0.0
+  sigma_phiphi: 6.1e-05
+source:
+  source_balance_par_loss: false
+  source_gauss_ampl_n:
+  - 250.0
+  source_gauss_ampl_phi:
+  - 0.0
+  source_gauss_sigma_x:
+  - 0.1
+  source_gauss_sigma_y:
+  - 0.0
+  source_gauss_x0:
+  - 0.0
+  source_gauss_y0:
+  - 0.0
+time:
+  Nt_diag: 2048
+  Nt_rk4: null
+  Tsim: null
+  dt_diag: 0.002
+  dt_rk4: null
+  rk4_per_diag: 16384

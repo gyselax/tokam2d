@@ -70,6 +70,7 @@ class SimulationRunner:
         self.saver = saver
         self.logger = params.logger
 
+
         # Retrieve the PDE parameters
         self.eq = params.user["pde"]["eq"]
         self.pde = params.pde
@@ -84,6 +85,7 @@ class SimulationRunner:
         self.dt_diag = params.user["time"]["dt_diag"]
         self.rk4_per_diag = params.user["time"]["rk4_per_diag"]
         self.Tsim = params.user["time"]["Tsim"]
+
 
         self.time = 0.0
         self.step_rk4_count = 0
@@ -308,10 +310,14 @@ class SimulationRunner:
     def _spawn_structure(self, fields):
 
         y0_list = [self.y0] if not isinstance(self.y0, list) else self.y0
+        # rk4_per_spawn_period = self.spawn_period//self.dt_rk4
+        diag_per_spawn_period = self.spawn_period//self.dt_diag
 
         for y0 in y0_list:
             # if self.time%self.spawn_period < self.dt_rk4 and self.time > 0:
-            if self.time%self.spawn_period < self.dt_diag and self.time > 0:
+            # if self.time%self.spawn_period < self.dt_diag and self.time > 0:
+            # if self.step_rk4_count%rk4_per_spawn_period == 0 and self.time > 0:
+            if self.step_diag_count%diag_per_spawn_period == 0 and self.time > 0:
             
                 self.logger.info(f"Spawning structure at time {self.time:.3f} and y0={y0:.3f}")
 
