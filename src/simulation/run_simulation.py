@@ -123,6 +123,7 @@ class SimulationRunner:
         """
         Run the simulation for Nt_rk4 steps, calling callbacks and inline operations
         at each diagnostic step.
+        TODO: jax.lax.scan
         """
         while self.step_rk4_count < self.Nt_rk4 and not self._stop:
 

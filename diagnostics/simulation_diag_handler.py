@@ -68,6 +68,8 @@ class Simulation:
             self.ky2D = np.array(self.ky)[:,np.newaxis]*np.ones_like(self.kx)[np.newaxis,:]
             self.k2D  = np.sqrt(self.kx2D**2 + self.ky2D**2)
 
+            
+
             self.time = np.array(self["time"])
             self.t = self.time
             self.x = np.array(self["x"])
@@ -443,7 +445,8 @@ class Simulation:
             if vmin == None: vmin = np.min(data_slice)
             if vmax == None: vmax = np.max(data_slice)
 
-            p = ax.imshow(data_slice, cmap=cmap, origin='lower', vmin=vmin, vmax=vmax, extent=(0, Lx, 0, Ly))
+            # p = ax.imshow(data_slice, cmap=cmap, origin='lower', vmin=vmin, vmax=vmax, extent=(0, Lx, 0, Ly))
+            p = ax.pcolormesh(x, y, data_slice, cmap=cmap, vmin=vmin, vmax=vmax)
 
             if not for_IA:
                 divider = make_axes_locatable(ax)
@@ -474,6 +477,77 @@ class Simulation:
             with open(filepath, 'wb') as f:
                 f.write(buf.getvalue())
         return filepath
+
+    # @staticmethod
+    # def _save_frame_article(params):
+    #     """Generate and save a single frame, optimized for parallel execution."""
+    #     for_IA, scheme, save_folder_path, acronym_simu, it, time_slice, data_slice, data_name, cmap, vmin, vmax, Lx, Ly, x, y, dpi, fig_scale, contour_bool, contour_field, contour_levels = params
+    #     frame_name = f'{acronym_simu}_{data_name}_{it:05d}.png'
+    #     filepath = os.path.join(Path(save_folder_path), frame_name)
+    #     logging.info(f'Generating frame {it}')
+    #     # Use BytesIO as an in-memory buffer, so that the disk is not accessed when generating the frames
+    #     with io.BytesIO() as buf:
+    #         aspect_ratio = Lx / Ly
+    #         if Lx > Ly:
+    #             size_y = 12
+    #             size_x = size_y * aspect_ratio
+    #         else:
+    #             size_x = 12
+    #             size_y = size_x / aspect_ratio
+    #         # fig, ax = plt.subplots(figsize=(fig_scale*size_x, fig_scale*size_y), dpi=dpi)#, layout='constrained')
+    #         fig, ax = plt.subplots(figsize=(fig_scale*size_x, fig_scale*size_y), dpi=dpi)#, layout='constrained')
+
+    #         if vmin == None: vmin = np.min(data_slice)
+    #         if vmax == None: vmax = np.max(data_slice)
+
+    #         # p = ax.imshow(data_slice, cmap=cmap, origin='lower', vmin=vmin, vmax=vmax, extent=(0, Lx, 0, Ly))
+    #         p = ax.pcolormesh(x, y, data_slice, cmap=cmap, vmin=vmin, vmax=vmax)
+
+    #         if not for_IA:
+    #             divider = make_axes_locatable(ax)
+    #             cax = divider.append_axes("right", size="5%", pad=0.05)
+    #             cbar = fig.colorbar(p, cax=cax)
+    #             cbar.ax.yaxis.set_major_formatter(FuncFormatter(lambda x, _: f'{x:.2e}'))
+    #             # ax.set_title(f'{data_name.capitalize()} at time = {time_slice:.2f} {time_norm}')
+    #             ax.set_title(rf'{data_name} at $\widehat{t}$ = {time_slice:.2f}')
+    #             ax.set_xlabel(r'$\widehat{x}$')
+    #             ax.set_ylabel(r'$\widehat{y}$')
+    #         else:
+    #             ax.axis('off')
+
+    #         sim_info = {
+    #             r"$S_c$" = self["Pr"][()],
+    #             r"$R_a$" = self["Ra"][()]
+    #         }
+
+    #         text = ""
+    #         for key, val in sim_info.items():
+    #             text += ""
+
+    #         ax.text(0.02, 0.1, text, 
+    #                 transform=ax.transAxes, 
+    #                 fontsize=10, 
+    #                 verticalalignment='bottom', 
+    #                 horizontalalignment='left', 
+    #                 bbox=dict(boxstyle='square', facecolor='white', alpha=0.8))
+
+    #         if contour_bool:
+    #             if contour_field is None: contour_field = data_slice
+    #             if contour_levels is None:
+    #                 contour_levels = np.linspace(np.min(contour_field), np.max(contour_field), 10)
+    #             # contour = ax.contour(contour_field, levels=contour_levels, colors='k', linewidths=0.5)
+    #             contours_levels_pos = [level for level in contour_levels if level > 0]
+    #             contours_levels_neg = [level for level in contour_levels if level <= 0]
+    #             contour_pos = ax.contour(x, y, contour_field, levels=contours_levels_pos, colors='r', linewidths=1.5)
+    #             contour_neg = ax.contour(x, y, contour_field, levels=contours_levels_neg, colors='b', linewidths=1.5)
+
+    #         fig.tight_layout()
+    #         fig.savefig(buf, format='png')
+    #         plt.close(fig)  # Close the figure to free memory
+    #         buf.seek(0)
+    #         with open(filepath, 'wb') as f:
+    #             f.write(buf.getvalue())
+    #     return filepath
 
 
     # Function to generate and save frames, with optional parallel execution
